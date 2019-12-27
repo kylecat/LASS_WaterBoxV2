@@ -7,13 +7,13 @@
 #include <stddef.h>
 #include <stdint.h>  // for uint8_t
 
-#include "../Memory/MemoryPool.hpp"
-#include "../Misc/Visitable.hpp"
-#include "../Operators/VariantOperators.hpp"
-#include "../Polyfills/type_traits.hpp"
-#include "VariantAs.hpp"
-#include "VariantFunctions.hpp"
-#include "VariantRef.hpp"
+#include <ArduinoJson/Memory/MemoryPool.hpp>
+#include <ArduinoJson/Misc/Visitable.hpp>
+#include <ArduinoJson/Operators/VariantOperators.hpp>
+#include <ArduinoJson/Polyfills/type_traits.hpp>
+#include <ArduinoJson/Variant/VariantAs.hpp>
+#include <ArduinoJson/Variant/VariantFunctions.hpp>
+#include <ArduinoJson/Variant/VariantRef.hpp>
 
 namespace ARDUINOJSON_NAMESPACE {
 
@@ -222,6 +222,7 @@ class VariantRef : public VariantRefBase<VariantData>,
   // set(ArrayConstRef)
   // set(ObjectRef)
   // set(ObjecConstRef)
+  // set(const JsonDocument&)
   template <typename TVariant>
   typename enable_if<IsVisitable<TVariant>::value, bool>::type set(
       const TVariant &value) const;
@@ -378,6 +379,14 @@ class VariantConstRef : public VariantRefBase<const VariantData>,
       operator[](TChar *key) const {
     const CollectionData *obj = variantAsObject(_data);
     return VariantConstRef(obj ? obj->get(adaptString(key)) : 0);
+  }
+
+  FORCE_INLINE bool operator==(VariantConstRef lhs) const {
+    return variantEquals(_data, lhs._data);
+  }
+
+  FORCE_INLINE bool operator!=(VariantConstRef lhs) const {
+    return !variantEquals(_data, lhs._data);
   }
 };
 }  // namespace ARDUINOJSON_NAMESPACE

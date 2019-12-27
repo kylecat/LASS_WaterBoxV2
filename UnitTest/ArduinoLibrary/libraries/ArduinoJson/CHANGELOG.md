@@ -1,6 +1,49 @@
 ArduinoJson: change log
 =======================
 
+v6.13.0 (2019-11-01)
+-------
+
+* Added support for custom writer/reader classes (issue #1088)
+* Added conversion from `JsonArray` and `JsonObject` to `bool`, to be consistent with `JsonVariant`
+* Fixed `deserializeJson()` when input contains duplicate keys (issue #1095)
+* Improved `deserializeMsgPack()` speed by reading several bytes at once
+* Added detection of Atmel AVR8/GNU C Compiler (issue #1112)
+* Fixed deserializer that stopped reading at the first `0xFF` (PR #1118 by @mikee47)
+* Fixed dangling reference in copies of `MemberProxy` and `ElementProxy` (issue #1120)
+
+v6.12.0 (2019-09-05)
+-------
+
+* Use absolute instead of relative includes (issue #1072)
+* Changed `JsonVariant::as<bool>()` to return `true` for any non-null value (issue #1005)
+* Moved ancillary files to `extras/` (issue #1011)
+
+v6.11.5 (2019-08-23)
+-------
+
+* Added fallback implementations of `strlen_P()`, `strncmp_P()`, `strcmp_P()`, and `memcpy_P()` (issue #1073)
+
+v6.11.4 (2019-08-12)
+-------
+
+* Added `measureJson()` to the `ArduinoJson` namespace (PR #1069 by @nomis)
+* Added support for `basic_string<char, traits, allocator>` (issue #1045)
+* Fixed example `JsonConfigFile.ino` for ESP8266
+* Include `Arduino.h` if `ARDUINO` is defined (PR #1071 by @nomis)
+
+v6.11.3 (2019-07-22)
+-------
+
+* Added operators `==` and `!=` for `JsonDocument`, `ElementProxy`, and `MemberProxy`
+* Fixed comparison of `JsonVariant` when one contains a linked string and the other contains an owned string (issue #1051)
+
+v6.11.2 (2019-07-08)
+-------
+
+* Fixed assignment of `JsonDocument` to `JsonVariant` (issue #1023)
+* Fix invalid conversion error on Particle Argon (issue #1035)
+
 v6.11.1 (2019-06-21)
 -------
 

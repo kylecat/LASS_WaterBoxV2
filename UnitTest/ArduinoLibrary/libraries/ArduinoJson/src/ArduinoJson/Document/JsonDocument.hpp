@@ -4,13 +4,12 @@
 
 #pragma once
 
-#include "../Memory/MemoryPool.hpp"
-#include "../Object/ObjectRef.hpp"
-#include "../Variant/VariantRef.hpp"
-#include "../Variant/VariantTo.hpp"
-
-#include "../Array/ElementProxy.hpp"
-#include "../Object/MemberProxy.hpp"
+#include <ArduinoJson/Array/ElementProxy.hpp>
+#include <ArduinoJson/Memory/MemoryPool.hpp>
+#include <ArduinoJson/Object/MemberProxy.hpp>
+#include <ArduinoJson/Object/ObjectRef.hpp>
+#include <ArduinoJson/Variant/VariantRef.hpp>
+#include <ArduinoJson/Variant/VariantTo.hpp>
 
 namespace ARDUINOJSON_NAMESPACE {
 
@@ -142,11 +141,10 @@ class JsonDocument : public Visitable {
   // operator[](const std::string&)
   // operator[](const String&)
   template <typename TString>
-  FORCE_INLINE
-      typename enable_if<IsString<TString>::value,
-                         MemberProxy<JsonDocument&, const TString&> >::type
-      operator[](const TString& key) {
-    return MemberProxy<JsonDocument&, const TString&>(*this, key);
+  FORCE_INLINE typename enable_if<IsString<TString>::value,
+                                  MemberProxy<JsonDocument&, TString> >::type
+  operator[](const TString& key) {
+    return MemberProxy<JsonDocument&, TString>(*this, key);
   }
 
   // operator[](char*)
@@ -276,6 +274,18 @@ class JsonDocument : public Visitable {
   FORCE_INLINE typename enable_if<IsString<TString>::value>::type remove(
       const TString& key) {
     _data.remove(adaptString(key));
+  }
+
+  FORCE_INLINE operator VariantConstRef() const {
+    return VariantConstRef(&_data);
+  }
+
+  bool operator==(VariantConstRef rhs) const {
+    return getVariant() == rhs;
+  }
+
+  bool operator!=(VariantConstRef rhs) const {
+    return getVariant() != rhs;
   }
 
  protected:

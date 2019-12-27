@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include "../Misc/SerializedValue.hpp"
-#include "../Numbers/convertNumber.hpp"
-#include "../Polyfills/gsl/not_null.hpp"
-#include "VariantContent.hpp"
+#include <ArduinoJson/Misc/SerializedValue.hpp>
+#include <ArduinoJson/Numbers/convertNumber.hpp>
+#include <ArduinoJson/Polyfills/gsl/not_null.hpp>
+#include <ArduinoJson/Strings/RamStringAdapter.hpp>
+#include <ArduinoJson/Variant/VariantContent.hpp>
 
 namespace ARDUINOJSON_NAMESPACE {
 
@@ -101,7 +102,9 @@ class VariantData {
   }
 
   bool equals(const VariantData &other) const {
-    if (type() != other.type()) return false;
+    // Check that variant have the same type, but ignore string ownership
+    if ((type() | OWNERSHIP_BIT) != (other.type() | OWNERSHIP_BIT))
+      return false;
 
     switch (type()) {
       case VALUE_IS_LINKED_STRING:

@@ -63,7 +63,7 @@ void setup()
     pinMode(VR_1, INPUT);
     pinMode(VR_2, INPUT);
   *****<< 這是舊的pin設定 >>*****************/
-  //  ads.begin(); //放到systemPower()裡面
+    ads.begin(); //放到systemPower()裡面
 
 
   // The ADC input range (or gain) can be changed via the following
