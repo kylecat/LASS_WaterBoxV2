@@ -1,97 +1,65 @@
-/**** << WaterBox_V2.1: 說明 >> *****
-     TODO：操作介面
-     TODO：充放電電流量測
-     TODO：續航力測試
-***********************************************************/
-#include <Wire.h>             // I2C library
-#include <Adafruit_ADS1015.h> // ADS1115 library
-
-#include <RTClib.h>           // DS3231 library
-#include <OneWire.h>          // DS18B20 library
-
-#include <SPI.h>              // for SD Card
-#include <SD.h>               // SD Card library
-
-#include <LoRa.h>              // LoRa 函式庫
-#include <EEPROM.h>            // EEPROM in 7697
-//#include <ArduinoJson.h>     // JSON 函式庫
+/***** << WaterBox_V2.:LSleep with OLED and SD>> *****
+  PCB borad：WaterBox V2.1
+  功能：基本系統功能測試
+  測試項目：
+    1.OLED
+    2.EEPROM
+    3.LSleep
+    4.SD ：使用前需留意LoRa的CS(P10)是否已經上拉，不然會抓到LoRa模組
+    5.Temp
+    6.pH EC
+******************************************************/
+/***** << WaterBox_V2.1:LinkIt 7697 EEPROM library >> *****/
+#include <EEPROM.h>           // EEPROM library
 
 
-/**** << WaterBox_V2.1: pin state test with ADS1115 >> *****
-     ADC 數據及 switch 切換
-     使用Library Adafruit_ADS1X15 (Ver. 1.0.1)
-***********************************************************/
+/**** << WaterBox_V2.1:LinkIt 7697 Wifi library >> *****/
+#include <LWiFi.h>
 
-Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
-//Adafruit_ADS1015 ads;     /* Use thi for the 12-bit version */
+char ssid[] = "KyleiPhoneXR";      //  your network SSID (name)
+char pass[] = "11115555";  // your network password (use for WPA, or use as key for WEP)
+int keyIndex = 0;                     // your network key Index number (needed only for WEP)
 
-//#include "LASSWaterBox.h" 還沒定義好
-// 腳位設定
-#define power_pin   14      // Linklt 7969 以外的所有模組電源開關
-#define switch_pin  5
-#define USR_pin     6
-#define DS18B20_Pin 7
+int status = WL_IDLE_STATUS;
 
-// CS pin for SD
-#define SD_CS       4
-
-// CS pin for LoRa  VDD:3.3V
-#define LoRa_DIO0   2 // only pin 1,2,3,
-#define LoRa_Reset  3
-#define LoRa_CS    10
-
-// 全域變數設定
-#define ADC_CAL 3350
+// if you don't want to use DNS (and reduce your sketch size)
+// use the numeric IP instead of the name for the server:
+//IPAddress server(117,185,24,248);
+char server[] = "download.labs.mediatek.com";   // http://download.labs.mediatek.com/linkit_7697_ascii.txt
 
 
-/**** << WaterBox_V2.1:LinkIt 7697 睡眠用library >> *****
-   說明：LinkIt 7697 睡眠功能設定
-   Library： "LSleep.h"
-***********************************************************/
-// 省電用 library
-#include "LSleep.h"
-LSleepClass Sleep;
 
-// 重新定義Serial
-HardwareSerial & ToSerial = Serial;
+// This is the root certificate for our host.
+// Different host server may have different root CA.
+static const char rootCA[] = "-----BEGIN CERTIFICATE-----\r\n"
+                             "MIIDSjCCAjKgAwIBAgIQRK+wgNajJ7qJMDmGLvhAazANBgkqhkiG9w0BAQUFADA/\r\n"
+                             "MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMT\r\n"
+                             "DkRTVCBSb290IENBIFgzMB4XDTAwMDkzMDIxMTIxOVoXDTIxMDkzMDE0MDExNVow\r\n"
+                             "PzEkMCIGA1UEChMbRGlnaXRhbCBTaWduYXR1cmUgVHJ1c3QgQ28uMRcwFQYDVQQD\r\n"
+                             "Ew5EU1QgUm9vdCBDQSBYMzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\r\n"
+                             "AN+v6ZdQCINXtMxiZfaQguzH0yxrMMpb7NnDfcdAwRgUi+DoM3ZJKuM/IUmTrE4O\r\n"
+                             "rz5Iy2Xu/NMhD2XSKtkyj4zl93ewEnu1lcCJo6m67XMuegwGMoOifooUMM0RoOEq\r\n"
+                             "OLl5CjH9UL2AZd+3UWODyOKIYepLYYHsUmu5ouJLGiifSKOeDNoJjj4XLh7dIN9b\r\n"
+                             "xiqKqy69cK3FCxolkHRyxXtqqzTWMIn/5WgTe1QLyNau7Fqckh49ZLOMxt+/yUFw\r\n"
+                             "7BZy1SbsOFU5Q9D8/RhcQPGX69Wam40dutolucbY38EVAjqr2m7xPi71XAicPNaD\r\n"
+                             "aeQQmxkqtilX4+U9m5/wAl0CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNV\r\n"
+                             "HQ8BAf8EBAMCAQYwHQYDVR0OBBYEFMSnsaR7LHH62+FLkHX/xBVghYkQMA0GCSqG\r\n"
+                             "SIb3DQEBBQUAA4IBAQCjGiybFwBcqR7uKGY3Or+Dxz9LwwmglSBd49lZRNI+DT69\r\n"
+                             "ikugdB/OEIKcdBodfpga3csTS7MgROSR6cz8faXbauX+5v3gTt23ADq1cEmv8uXr\r\n"
+                             "AvHRAosZy5Q6XkjEGB5YGV8eAlrwDPGxrancWYaLbumR9YbK+rlmM6pZW87ipxZz\r\n"
+                             "R8srzJmwN0jP41ZL9c8PDHIyh8bwRLtTcm1D9SZImlJnt1ir/md2cXjbDaJWFBM5\r\n"
+                             "JDGFoqgCWjBH4d1QB7wCCZAA62RjYJsWvIjJEubSfZGL+T0yjWW06XyxV3bqxbYo\r\n"
+                             "Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ\r\n"
+                             "-----END CERTIFICATE-----\r\n";
 
-
-/**** << WaterBox_V2.1:系統說明文字 >> *****
-   韌體版本：
-   說明文字：
-***********************************************************/
-const char* _firwareVersion = "Ver 2.1.a";
-
-
-/**** << WaterBox_V2.1:變數設定(全大寫) >> *****
-   水質參數
-   量測間隔
-   睡眠間隔
-***********************************************************/
-float pH_slop, pH_intercept, EC_slop, EC_intercept, pH_alarm, EC_alarm;
-int print_interval = 1000;
-
-
-/**** << WaterBox_V2.1:DS3231 時間模組 >> *****
-    功能：時間模組+EEPROM
-    library：RTClib.h
-    版本：1.2.0
-***********************************************************/
-RTC_DS3231 rtc;
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+// Initialize the Ethernet client library
+// with the IP address and port of the server
+// that you want to connect to (port 80 is default for HTTP):
+TLSClient client;
+//WiFiClient client;
 
 
-/**** << WaterBox_V2.1:DS18B20 溫度模組 >> *****
-    library：OneWire.h
-    版本：2.3.4
-***********************************************************/
-OneWire ds(DS18B20_Pin);
-
-
-/**** << WaterBox_V2.1:SSD1306 OLED顯示模組 >> *****
-    library：OneWire.h
-    版本：2.3.4
-***********************************************************/
+/***** << OLED library: u8g2 >> *****/
 #include <Arduino.h>
 #include <U8g2lib.h>
 
@@ -102,319 +70,306 @@ OneWire ds(DS18B20_Pin);
 #include <Wire.h>
 #endif
 
-//U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
-//U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/ SCL, /* data=*/ SDA, /* reset=*/ U8X8_PIN_NONE);   // All Boards without Reset of the Display
-U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
-
-uint8_t draw_color = 1;
+//U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
 
-/**** << WaterBox_V2.1:主程式Loop設定 >> *****
-    版本：2.1.a
+/***** << 省電用 library: 未使用 >> *****/
+#include "LSleep.h"
+LSleepClass Sleep;
+bool enableSleep = true;
+long SleepSec = 10;
+
+
+/***** << SD library >> *****/
+#include <SPI.h>
+#include <SD.h>
+File myFile;
+const int chipSelect = 4;
+
+
+/**** << WaterBox_V2.1:DS3231 時間模組 >> *****
+    功能：時間模組+EEPROM
+    library：RTClib.h
+    版本：1.2.0
 ***********************************************************/
+#include <RTClib.h>           // DS3231 library
+RTC_DS3231 rtc;
+
+
+/**** << WaterBox_V2.1:DS18B20 溫度模組 >> *****
+    library：DS18B20.h
+    版本：1.0.0
+***********************************************************/
+#define DS18B20_Pin 7
+#include <DS18B20.h>
+uint8_t address[] = {40, 250, 31, 218, 4, 0, 0, 52};
+
+
+/**** << WaterBox_V2.1:pin state test with ADS1115 >> *****
+   ADC 數據及 switch切換
+   使用Library Adafruit_ADS1X15 (Ver. 1.0.1)
+***********************************************************/
+#include <Wire.h>
+#include <Adafruit_ADS1015.h>
+
+Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
+//Adafruit_ADS1015 ads;     /* Use thi for the 12-bit version */
+int16_t adc0, adc1, adc2, adc3;
+
+#define pH_pin          0
+#define EC_pin          1
+#define Rotary_Pin_1    2  // VR1
+#define Rotary_Pin_2    3  // VR2
+
+
+/***** << GPIO設定 >> *****/
+#define sensorSwitch 6
+#define modeSwitch   5
+#define pinLED       7
+#define modulePower 14
+
+
+/***** << firmware Version >> *****/
+String _fw = "Ver 2.1.b";
+String Description_Tittle = ">> LASS IS YOURS <<";
+
+String Description_Firware = "The DEVICE FIRWARE: " + String(_fw);
+String Description_Features = "THIS VERSION HAS THE　FOLLOWING FEATURES:\n\r"\
+                              "\t 1.Get the EC and pH value via ADS1115 module\n\r"\
+                              "\t 2.Get temptrue value via DS18B20 module\n\r"\
+                              "\t 3.Save DATA with CSV format by Day\n\r"\
+                              "\t 4.Upload Data to ThingSpeak cloud platform via WiFi\n\r";
+String Description_Precautions = "<< PRECAUTIONS >>\n\r"\
+                                 "\t 1.All module power controled by P14\n\r"\
+                                 "\t 2.LinkIt 7697 was not into deep sleep mode\n\r"\
+                                 "\t 3.LoRa module did not used in this version\n\r";
+
+
+/***** << 系統參數 >> *****/
+float pH_slop, pH_intercept, EC_slop, EC_intercept, pH_alarm, EC_alarm;
+int print_interval = 1000;
+
+int _c = 0;
+float Temp_value, pH_value, EC_value, Tubidity_value;
+float SensorValue[7] = {0};
+bool _modeStatus = true;
+
 int chapter = 0;                               //  大項目：0~1(校正設定,時間設定)
 int item = 0;                                  //  子項目：0~3(準備,參數1設定,參數2設定,參數3設定)
 bool config_state = true;                      //  true時只能顯示目前設定，flase時可以改設定
 int _YY, _year_1, _year_2, _MM, _DD, _HH, _mm; //  時間日期調整用
 
+int _year, _month, _day, _hour, _minute, _second;       //  系統時間用
+unsigned long Tick = 0;
 
-/**** << WaterBox_V2.1:SSD1306 OLED顯示用functin >> *****
+String CSV_Header;   // 寫入CSV時的表頭
+String CSV_fileName; // 檔案名稱(需少於8個字元)
+String CSV_Data;     // CSV資料
+String str_Time;     // 資料寫入時的時間  "YYYY-MM-DD mm:hh"
 
-********************************************************/
-void OLED_result_u8g2(String _s_d, String _s_1, String _s_2 = "", float _sec = 0.5)
+unsigned  long _SD_tag, _upload_tag;  // 用來記錄要不要寫入SD卡/上傳雲端的時間戳
+
+String alarmStr;                      // 用來記錄要不要顯示alarm
+
+/***** << OLED function >> *****/
+void OLED_msg(String _verMsg, float _delay = 0.5, bool _savePower = true)
 {
   u8g2.begin();
+  u8g2.setFlipMode(0);
+  if (_savePower) u8g2.setPowerSave(0); // 打開螢幕
 
-  const char* _date = _s_d.c_str();
-  const char* _str_1 = _s_1.c_str();
-  const char* _str_2 = _s_2.c_str();
+  u8g2.firstPage();
+  do {
+    u8g2.setFont(u8g2_font_8x13B_tf);                   // 一個字母8 Pixel 寬，行高12
+    u8g2.drawStr(24, 12, ">> LASS <<");                 // 16-10 = 6, 6*8=48 -> 24 開始
 
-  int _delay = (int) (_sec * 1000);
+    u8g2.setFont(u8g2_font_timR08_tr);                 // 一個字母8 Pixel 寬，行高12
+    u8g2.drawStr(80, 20, _fw.c_str());                 // 16-13 = 3, 3*8=24 -> 12 開始
 
-  u8g2.clearBuffer();
-  // 10 Pixel Height
-  u8g2.setFont(u8g2_font_8x13B_tf);          // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(4, 12, ">> WATER BOX <<");    // 16-15 = 1, 1 * 8 = 8 -> 4 開始
+    u8g2.setFont(u8g2_font_helvR14_te);                // 一個字母8 Pixel 寬，行高12
+    u8g2.drawStr(0, 40, _verMsg.c_str());              // 16-13 = 3, 3*8=24 -> 12 開始
+  } while ( u8g2.nextPage() );
 
-  u8g2.setFont(u8g2_font_timR08_tr);         // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(0, 24, _date);                // 靠左開始
-
-  // 14 Pixel Height
-  u8g2.setFont(u8g2_font_helvB14_tr);        // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(0, 40, _str_1);              // 16-13 = 3, 3*8=24 -> 12 開始
-  u8g2.drawStr(0, 56, _str_2);
-  u8g2.sendBuffer();
-  delay(_delay);
+  delay(_delay * 1000);
+  if (_savePower) u8g2.setPowerSave(1); // 關閉螢幕
 }
 
-void OLED_status_u8g2(String _m_1, String _m_2 = "", float _sec = 0.5)
+void OLED_content(String _msg1, String _msg2 = "", float _delay = 0.5, bool _savePower = true)
 {
-
   u8g2.begin();
+  u8g2.setFlipMode(0);
+  if (_savePower) u8g2.setPowerSave(0); // 打開螢幕
 
-  const char* _msg_1 = _m_1.c_str();
-  const char* _msg_2 = _m_2.c_str();
-  int _fw_length = 128 - 8 * strlen(_firwareVersion);
-  int _delay = (int) (_sec * 1000);
+  u8g2.firstPage();
+  do {
+    u8g2.setFont(u8g2_font_8x13B_tf);                   // 字母寬10Pixel，高13Pixel，行高12
+    u8g2.drawStr(24, 12, ">> LASS <<");                 // LASS logo
 
-  u8g2.clearBuffer();
-  // 10 Pixel Height
-  u8g2.setFont(u8g2_font_8x13B_tf);       // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(24, 12, ">> LASS <<");    // 16-10 = 6, 6*8=48 -> 24 開始
+    u8g2.setFont(u8g2_font_timR08_tr);                  // 5x8 字母寬5Pixel，高8Pixel，行高10
+    u8g2.drawStr(80, 20, _fw.c_str());                  // 韌體版本(靠右)
 
-  u8g2.setFont(u8g2_font_timR08_tr);         // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(_fw_length, 24, _firwareVersion); // 靠左開始
+    u8g2.setFont(u8g2_font_helvR14_te);                 // 18x23 字母寬18Pixel，高23Pixel，行高20
+    u8g2.drawStr(0, 40, _msg1.c_str());                 // 訊息A
+    u8g2.drawStr(0, 60, _msg2.c_str());                 // 訊息B
+  } while ( u8g2.nextPage() );
 
-  // 14 Pixel Height
-  u8g2.setFont(u8g2_font_helvB14_tr);      // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(0, 40, _msg_1);            // 16-13 = 3, 3*8=24 -> 12 開始
-  u8g2.drawStr(0, 56, _msg_2);
-  u8g2.sendBuffer();
-  delay(_delay);
+  delay(_delay * 1000);
+  if (_savePower) u8g2.setPowerSave(1); // 關閉螢幕
 }
 
-void OLED_setting_u8g2(String _m_1, String _m_2, String _m_3, float _sec = 0.5)
+void OLED_content_title(String _title, String _msg1, String _msg2 = "", String _msg3 = "", float _delay = 0.5, bool _savePower = true)
 {
-
   u8g2.begin();
+  u8g2.setFlipMode(0);
+  if (_savePower) u8g2.setPowerSave(0); // 打開螢幕
 
-  const char* _msg_1 = _m_1.c_str();
-  const char* _msg_2 = _m_2.c_str();
-  const char* _msg_3 = _m_3.c_str();
-  int _fw_length = 128 - 8 * strlen(_firwareVersion);
-  int _delay = (int) (_sec * 1000);
+  u8g2.firstPage();
+  do {
+    u8g2.setFont(u8g2_font_8x13B_tf);                   // 字母寬10Pixel，高13Pixel，行高12
+    u8g2.drawStr(24, 12, ">> LASS <<");                 // LASS logo
 
-  u8g2.clearBuffer();
-  // 10 Pixel Height
-  u8g2.setFont(u8g2_font_8x13B_tf);                               // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(24, 12, ">> LASS <<");                             // 16-10 = 6, 6 * 8=48 -> 24 開始
+    u8g2.setFont(u8g2_font_timR08_tr);                  // 5x8 字母寬5Pixel，高8Pixel，行高10
+    u8g2.drawStr(0, 20, _title.c_str());                // 左邊的小title
+    u8g2.drawStr(80, 20, _fw.c_str());                  // 韌體版本(靠右)
 
-  u8g2.setFont(u8g2_font_timR08_tr);         // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(0, 24, _msg_1);                                   // 一行12個字母
-  u8g2.drawStr(_fw_length, 36, _firwareVersion);                   // 靠左開始
+    u8g2.setFont(u8g2_font_helvR12_te);                 // 18x23 字母寬18Pixel，高23Pixel，行高20
+    u8g2.drawStr(0, 34, _msg1.c_str());                 // 訊息A
+    u8g2.drawStr(0, 49, _msg2.c_str());                 // 訊息B
 
-  u8g2.setFont(u8g2_font_helvB14_tr);      // 一個字母8 Pixel 寬，行高12
-  u8g2.drawStr(0, 48, _msg_2);
-  u8g2.drawStr(0, 60, _msg_3);
-  u8g2.sendBuffer();
-  delay(_delay);
+    u8g2.setFont(u8g2_font_6x13O_tf );                  // 5x8 字母寬5Pixel，高6Pixel，行高10
+    u8g2.drawStr(0, 63, _msg3.c_str());                 // 訊息C 最底層小字
+
+  } while ( u8g2.nextPage() );
+
+  delay(_delay * 1000);
+  if (_savePower) u8g2.setPowerSave(1); // 關閉螢幕
+}
+
+void OLED_smallContent(String _msg1, String _msg2 = "", String _msg3 = "", float _delay = 0.5, bool _savePower = true)
+{
+  u8g2.begin();
+  u8g2.setFlipMode(0);                 // 是否翻轉螢幕
+  if (_savePower)u8g2.setPowerSave(0); // 打開螢幕
+
+  u8g2.firstPage();
+  do {
+    u8g2.setFont(u8g2_font_8x13B_tf);                   // 字母寬10Pixel，高13Pixel，行高12
+    u8g2.drawStr(24, 12, ">> LASS <<");                 // LASS logo
+
+    u8g2.setFont(u8g2_font_timR08_tr);                  // 5x8 字母寬5Pixel，高8Pixel，行高10
+    u8g2.drawStr(80, 20, _fw.c_str());                  // 韌體版本(靠右)
+
+    u8g2.setFont(u8g2_font_helvR12_te);                 // 15x20 字母寬15Pixel，高20Pixel，行高15
+    u8g2.drawStr(0, 34, _msg1.c_str());                 // 訊息A
+    u8g2.drawStr(0, 49, _msg2.c_str());                 // 訊息B
+
+    u8g2.setFont(u8g2_font_6x13O_tf );                  // 5x8 字母寬5Pixel，高6Pixel，行高10
+    u8g2.drawStr(0, 62, _msg3.c_str());                 // 訊息C 最底層小字
+  } while ( u8g2.nextPage() );
+
+  delay(_delay * 1000);
+  if (_savePower)u8g2.setPowerSave(1); // 關閉螢幕
 }
 
 
-
-/**** << WaterBox_V2.1:數據處理用funtion >> *****
-
-********************************************************/
-double averge_array(int* arr, int number)
+/***** << SD function >> *****/
+bool SD_checkDir(String _dirName)
 {
-  int i;
-  int max, min;
-  double avg;
-  long amount = 0;
-
-  if (number <= 0)
+  bool _stateCheck = SD.exists(_dirName);
+  if (_stateCheck)
   {
-    ToSerial.println("Error number for the array to avraging!/n");
-    return 0;
+    Serial.println("[SD ] Directory <" + _dirName + "> exists");
   }
+  else {
+    Serial.println("[SD ] Directory <" + _dirName + "> did not exist");
+    _stateCheck = SD.mkdir(_dirName);
 
-  if (number < 5) { //less than 5, calculated directly statistics
-    for (i = 0; i < number; i++) {
-      amount += arr[i];
-    }
-    avg = amount / number;
-    return avg;
+    Serial.print("[SD ] Make a new directory:");
+    if (_stateCheck) Serial.println("success");
+    else             Serial.println("failed");
   }
-  else {            // 大於5個資料時的處理方式
-
-    if (arr[0] < arr[1]) {        // 確認前一筆的資料比較小
-      min = arr[0]; max = arr[1];
-    }
-    else {
-      min = arr[1]; max = arr[0];
-    } // end of if
-
-    // 過濾最大級最小的兩筆資料，不納入計算
-    for (i = 2; i < number; i++) {
-      if (arr[i] < min) {   // 低於下限值以下限值計算，並更新下限值
-        amount += min;      // arr < min
-        min = arr[i];
-      } else {
-        if (arr[i] > max) { // 高於上限值以上現值計算，並更新上限值
-          amount += max;    // arr > max
-          max = arr[i];
-        } else {            // 未達上下現值，直接納入計算
-          amount += arr[i]; // min<=arr<=max
-        }
-      } //if
-    } //for
-
-    avg = (double)amount / (number - 2);
-
-  }//if
-
-  return avg;
+  return _stateCheck;
 }
 
-
-/**** << WaterBox_V2.1:ADS1115轉換數值用funtion >> *****
-  把特定的ADC腳位電壓，換算成0-val的數值後返回float格式
-  rotary_button(指定的ADC pin, 要轉換的數值)
-********************************************************/
-float _analog_convert(uint8_t pin, int _val)
+bool SD_SaveCSV(String _dirName, String _fileName, String _data)
 {
-  //  int  _read = analogRead(pin);
-  int  _read = ads.readADC_SingleEnded(pin);
-  float _readVolt = _read * 0.125;
+  bool _stateCheck = SD_checkDir(_dirName);
+  String fileLocation = _dirName + "/" + _fileName + ".CSV";
 
-  float _value = map(_readVolt, 0, ADC_CAL, 0, _val);            // _val ~ 0
-  _value = _val - _value;
-
-  if (_readVolt > 4000) _value = -1;
-
-  return _value;
-}
-
-
-/**** << WaterBox_V2.1:ADS1115轉換數值用funtion >> *****
-  濁度(Tubidity)換算：讀取ADS1115某個pin上的電壓(A0)
-********************************************************/
-int getVoltage(int _ch)
-{
-  int adc = ads.readADC_SingleEnded(_ch);
-  int mV = adc * 0.125;
-  return mV;
-}
-
-double getTubidity(int _mV)
-{
-  double voltage = _mV * 0.001;
-  //  double tubidity = -1120.4 * voltage * voltage + 5742.3 * voltage - 4352.9;    // 官方公式
-  double tubidity = 1071.2 * voltage * voltage - 6418.5 * voltage + 9952.1;     // 實驗結果 Tubidity<800 NTU
-
-  return tubidity;
-}
-
-double Tubidity_value()
-{
-  int _ads_Volate = getVoltage(0);
-  return getTubidity(_ads_Volate);
-}
-
-
-/**** << WaterBox_V2.1:ADS1115轉換數值用funtion >> *****
-  導電度(Conductivity)換算：讀取ADS1115某個pin上的電壓(A1)
-********************************************************/
-int EC_value(float temperature = 25.0, float slope = 1.0, float intercept = 0.0)
-{
-  long _value_total = 0;
-  long _sample_time = millis(); // 初始化採樣時間
-  long _t = millis();           // 計時用
-
-  // 在800ms內，每50ms連續取樣放到array中
-  float _value = _analog_convert(1, 5000); // 還原成真正的訊號輸出電壓
-
-  // 溫度補償係數
-  float _temp_coefficient = 1.0 + 0.0185 * (temperature - 25.0);      //temperature compensation formula: fFinalResult(25^C) = fFinalResult(current)/(1.0+0.0185*(fTP-25.0));
-  float _coefficient_volatge = _value / _temp_coefficient;  // 電壓係數
-
-  // 三個不同區間的導電度換算
-  if (_coefficient_volatge < 150)       {
-    ToSerial.print("No solution!(");
-    ToSerial.print(_value);
-    ToSerial.println(")");
-    _value = 6.84 * _coefficient_volatge - 200; // EC <= 1ms/cm (暫定)
-    if (_value < 0) _value = 0;
+  if (_stateCheck)  {
+    _stateCheck = SD_WriteData(fileLocation, _data);
   }
-  else if (_coefficient_volatge > 3300) {
-    ToSerial.println("Out of the range!(");
-    ToSerial.print(_value);
-    ToSerial.println(")");
-    _value = 5.3 * _coefficient_volatge + 2278; // 20ms/cm<EC (暫定)
+  else            Serial.println("[SD ] Directory check failed");
+
+  return _stateCheck;
+}
+
+bool SD_WriteData(String _fileName, String _data)
+{
+  bool _stateCheck;
+  bool _hasFile = SD.exists(_fileName);
+
+  myFile = SD.open(_fileName, FILE_WRITE);
+  if (myFile)
+  {
+    Serial.print("[SD ] Saving Data: ");
+
+    if (!_hasFile) myFile.println(CSV_Header);
+
+    myFile.println(_data);
+    myFile.close();
+
+    Serial.println("Done");
+    _stateCheck = true;
   }
   else
   {
-    if (_coefficient_volatge <= 448)        _value = 6.84 * _coefficient_volatge - 64.32; // 1ms/cm<EC<=3ms/cm
-    else if (_coefficient_volatge <= 1457)  _value = 6.98 * _coefficient_volatge - 127;   // 3ms/cm<EC<=10ms/cm
-    else                                    _value = 5.3 * _coefficient_volatge + 2278;   // 10ms/cm<EC<20ms/cm
+    myFile.close();
+    Serial.println("[SD ] error opening " + _fileName);
+    _stateCheck = false;
   }
-
-  // 手動線性校正
-  _value = _value * slope + intercept;
-
-  _t = millis() - _t;   // 結算分析時間
-  delay(1000 - _t);
-
-  ToSerial.println("EC分析時間 >> " + (String)_t + "(ms)");
-
-  return _value;
+  return _stateCheck;
 }
 
-
-/**** << WaterBox_V2.1:DS18B20轉換數值用funtion >> *****
-   TempProcess(bool ch)
-   ch 為 true時讀取溫度，反之檢查溫模組並進入準備狀態
-********************************************************/
-float TempProcess(bool ch)
+void SavingData(String _fileName, String _data)
 {
-  //returns the temperature from one DS18B20 in DEG Celsius
-  static byte data[12];
-  static byte addr[8];
-  static float TemperatureSum;
-  if (!ch) {
-    if ( !ds.search(addr)) {
-      ToSerial.println("no more sensors on chain, reset search!");
-      ds.reset_search();
-      return 0;
-    }
-    if ( OneWire::crc8( addr, 7) != addr[7]) {
-      ToSerial.println("CRC is not valid!");
-      return 0;
-    }
-    if ( addr[0] != 0x10 && addr[0] != 0x28) {
-      ToSerial.print("Device is not recognized!");
-      return 0;
-    }
-    ds.reset();
-    ds.select(addr);
-    ds.write(0x44, 1); // start conversion, with parasite power on at the end
-  }
-  else {
-    byte present = ds.reset();
-    ds.select(addr);
-    ds.write(0xBE); // Read Scratchpad
-    for (int i = 0; i < 9; i++) { // we need 9 bytes
-      data[i] = ds.read();
-    }
-    ds.reset_search();
-    byte MSB = data[1];
-    byte LSB = data[0];
-    float tempRead = ((MSB << 8) | LSB); //using two's compliment
-    // 原本OneWire函式庫中有另外進行位數的檢查，這邊忽略
+  SD.begin(chipSelect);
+  pinMode(10, OUTPUT);      // 手動控制LoRa 的CS
+  digitalWrite(10, HIGH);   // 上拉LoRa SPI 的CS腳位，避免抓到LoRa
 
-    TemperatureSum = tempRead / 16; // 攝氏溫度的計算
+  if (_fileName.length() > 8) {
+    Serial.println("[SD ] 檔案名稱過長: " + _fileName);
+    _fileName = _fileName.substring(0, 8);
   }
-  return TemperatureSum;
+  SD.begin(chipSelect);
+  SD_SaveCSV("DATA", _fileName, _data);  // 寫入資料
+  delay(50);
 }
 
-/*
-   讀取溫度資料
-  ch=0,let the DS18B20 start the convert;ch=1,MCU read the current temperature from the DS18B20.
-*/
 
-float temp_value()
+/***** << RTC function >> *****/
+bool initRTC(bool _setTime = false)
 {
-  float _temp  = TempProcess(true);  // read the current temperature from the  DS18B20
-  TempProcess(false);                // after the reading,start the convert for next reading
-  // 讓DS18B20進入準備狀態(檢查模組)
-  return _temp;
+  bool _state = true;
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    _state = false;
+  }
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, lets set the time!");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
+  if (_setTime) rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  return _state;
 }
 
 
-/**** << WaterBox_V2.1:控制介面用function >> *****
+/***** << GPIO function >> *****
    計算某pin上拉一次花多少秒(0.1)
    並設定上限秒數超過自動跳出回傳
-********************************************************/
+********************************/
 float pull_time(uint8_t pin, int _limit)
 {
   bool _virutal_button = false;             // 紀錄按鈕狀態用
@@ -448,9 +403,39 @@ float pull_time(uint8_t pin, int _limit)
 }
 
 
-/**** << WaterBox_V2.1:數值處理用funtion >> *****
+/***** << ADS1115 function >> *****/
+void initADC(void)
+{
+  ads.begin();
+  //                                                                ADS1015  ADS1115
+  //                                                                -------  -------
+  // ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
+  ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
+  // ads.setGain(GAIN_TWO);        // 2x gain   +/- 2.048V  1 bit = 1mV      0.0625mV
+  // ads.setGain(GAIN_FOUR);       // 4x gain   +/- 1.024V  1 bit = 0.5mV    0.03125mV
+  // ads.setGain(GAIN_EIGHT);      // 8x gain   +/- 0.512V  1 bit = 0.25mV   0.015625mV
+  // ads.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.125mV  0.0078125mV
+}
+
+float _getVoltage(int _ch)
+{
+  delay(1000);
+  int adc = ads.readADC_SingleEnded(_ch);
+  int mV = adc * 0.125;
+  return mV;
+}
+
+float _analog_convert(int _r_val, int _C_val)
+{
+  if (_r_val < 0) _r_val = 0;
+  float _value = _C_val * (_r_val * 0.125) / 3335.0;
+  return _value;
+}
+
+
+/***** << fromate function >> *****
    把int轉成2位數String，自動補0
-********************************************************/
+***********************************/
 String convert_2digits(int i)
 {
   String number;
@@ -460,106 +445,300 @@ String convert_2digits(int i)
 }
 
 
-/**** << WaterBox_V2.1:SD卡相關用funton >> *****
-********************************************************/
-bool InitSD()
+/***** << DFRobot function >> *****
+   DFRobot 模組用
+   getPH  // 讀取pH
+   getEC  // 讀取EC
+***********************************/
+float getPH(float slope = 1.0, float intercept = 0.0)
 {
-  bool _state = true;
 
-  ToSerial.print("初始化 SD card...");
-  if (!SD.begin(SD_CS)) {
-    ToSerial.println("初始化失敗，請檢查SD卡是否插入");
-    _state = false;
+  // 因為板子的電路會進行分壓，所以ADS1115量出來的電壓要再乘上2才會是電錶的電壓
+  float _ads_Volate = 2 * _getVoltage(pH_pin) * slope + intercept;
+  float pH_Value = 3.5 * _ads_Volate * 0.001;                                   // 分壓(5V->2.5V)後，用電壓換算成pH (斜率3.5的出處待確認)
+  return pH_Value;
+}
+
+float getECmV(float _mV)
+{
+  // 溫度補償係數
+  float _value;
+
+  // temperature compensation formula: fFinalResult(25^C) = fFinalResult(current)/(1.0+0.0185*(fTP-25.0));
+  // 先用22度做溫度補償
+  float _temp_coefficient = 1.0 + 0.0185 * (22.0 - 25.0);
+  float _coefficient_volatge = _mV / _temp_coefficient;  // 電壓係數
+
+  // 三個不同區間的導電度換算
+  if (_coefficient_volatge < 150)
+  {
+    _value = 6.84 * _coefficient_volatge - 200; // EC <= 1ms/cm (暫定)
+
+    Serial.print("[EC ]No solution!(");
+    Serial.print(_value);
+    Serial.println(")");
+
+    if (_value < 0) _value = 0;
   }
-  ToSerial.println("SD卡初始化完成");
-  return _state;
+  else if (_coefficient_volatge > 3300)
+  {
+    _value = 5.3 * _coefficient_volatge + 2278; // 20ms/cm<EC (暫定)
+
+    Serial.print("[EC ]Out of the range!(");
+    Serial.print(_value);
+    Serial.println(")");
+  }
+  else
+  {
+    if (_coefficient_volatge <= 448)        _value = 6.84 * _coefficient_volatge - 64.32; // 1ms/cm<EC<=3ms/cm
+    else if (_coefficient_volatge <= 1457)  _value = 6.98 * _coefficient_volatge - 127;   // 3ms/cm<EC<=10ms/cm
+    else                                    _value = 5.3 * _coefficient_volatge + 2278;   // 10ms/cm<EC<20ms/cm
+  }
+
+  return _value;
 }
 
-void save2SD(int Y, int M, int D, int h, int m, float t, float ph, float ec, float pH_mV)
+float getEC(float slope = 1.0, float intercept = 0.0)
 {
+  // 因為板子的電路會進行分壓，所以ADS1115量出來的電壓要再乘上2才會是電錶的電壓
+  float _ads_Volate = 2 * _getVoltage(EC_pin) * slope + intercept;
+  return getECmV(_ads_Volate);
+}
 
-  String file = String(Y) + convert_2digits(M) + convert_2digits(D) + ".csv";
-  String Header = "Date,Time,Tempture(C),pH,EC,pH_mV";
-  String data = String(Y) + "/" + convert_2digits(M) + "/" + convert_2digits(D) + "," + \
-                convert_2digits(h) + ":" + convert_2digits(m) + "," + \
-                String(t) + "," + String(ph) + "," + String(ec)  + String(pH_mV);
+float getTemp(void)
+{
+  DS18B20 ds(DS18B20_Pin);
+  return ds.getTempC();
+}
 
-  ToSerial.println("寫入SD卡中");
 
-  if (SD.exists(file)) {
-    File myFile = SD.open(file, FILE_WRITE);   // open file
-    if (myFile) {
-      myFile.println(data);
-      myFile.close();
+/***** << LinkIt 7697 wifi function >> *****
+   LinkIt 7697 WIFI 連線用
+***********************************/
+int connectWifi(bool _debug = false)
+{
+  status = WiFi.status();  // 更新wifi目前的狀況
+
+  if (_debug) {
+    Serial.println("[Wifi State] check state....");
+
+    switch (status) {
+      case WL_CONNECTED:
+        Serial.println("[Wifi State] connected to a WiFi network");
+        break;
+      case WL_NO_SHIELD:
+        Serial.println("[Wifi State] no WiFi shield is present");
+        break;
+      case WL_IDLE_STATUS:
+        Serial.println("[Wifi State] waiting to update WiFi conncet state");
+        break;
+      case WL_NO_SSID_AVAIL:
+        Serial.println("[Wifi State] no SSID are available");
+        break;
+      case WL_SCAN_COMPLETED:
+        Serial.println("[Wifi State] the scan networks is completed");
+        break;
+      case WL_CONNECT_FAILED:
+        Serial.println("[Wifi State] the connection fails for all the attempts");
+        break;
+      case WL_CONNECTION_LOST:
+        Serial.println("[Wifi State] the connection is lost");
+        break;
+      case WL_DISCONNECTED:
+        Serial.println("[Wifi State] disconnected from a network");
+        break;
+      default:
+        break;
     }
-    else {
-      ToSerial.println("SD卡檔案開啟錯誤 " + file);
-    }
-  } else {
-    File myFile = SD.open(file, FILE_WRITE);   // open a new file and add the table header:
-    if (myFile) {
-      myFile.println(Header);
-      myFile.println(data);
-      myFile.close();
-    }
-    else {
-      ToSerial.println("SD卡檔案建立錯誤 " + file);
+
+  }
+
+  for (int _c = 0;_c<2;_c++){
+    if (status != WL_CONNECTED)
+    {
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(ssid);
+    status = WiFi.begin(ssid, pass);
     }
   }
+  return WiFi.status();
+}
+
+void printWifiStatus()
+{
+  // print the SSID of the network you're attached to:
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+
+  // print your WiFi shield's IP address:
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
+
+  // print the received signal strength:
+  long rssi = WiFi.RSSI();
+  Serial.print("signal strength (RSSI):");
+  Serial.print(rssi);
+  Serial.println(" dBm");
 }
 
 
-/**** << WaterBox_V2.1:LoRa相關用funton >> *****
-********************************************************/
-bool InitLoRa()
+/***** << LinkIt 7697 upload function >> *****
+   LinkIt 7697 WIFI 上傳資料用
+***********************************/
+
+bool getLinkItLogo( bool _readResponse)
 {
-  bool _state = true;
-  LoRa.setPins(LoRa_CS, LoRa_Reset, LoRa_DIO0);
-  ToSerial.println(F("LoRa Sender init"));
-  if (!LoRa.begin(915E6)) {
-    ToSerial.println(F("Starting LoRa failed!"));
-    _state = false;
+  client.setRootCA(rootCA, sizeof(rootCA));
+  if (client.connect(server, 443)) {
+    Serial.println("connected to server (GET)");
+    // Make a HTTP request:
+    client.println("GET /linkit_7697_ascii.txt HTTP/1.0");
+    client.println("Host: download.labs.mediatek.com");
+    client.println("Accept: */*");
+    client.println("Connection: close");
+    client.println();
+    delay(500);
   }
-  return _state;
+  else Serial.println();
+
+  if (_readResponse)
+  {
+    while (client.available()) {
+      char c = client.read();
+      Serial.write(c);
+    }
+  }
+  Serial.println();
+  client.stop();
 }
 
-
-/**** << WaterBox_V2.1:睡眠模式設定用funtion >> *****
-********************************************************/
-void enterSleep(int _ms, int _mode)
+bool updateThingSpeak(String _api, String _field1Value, String _field2Value, String _field3Value)
 {
-  float _sleepTime = _ms * 0.001;
-  Sleep.init(true);
-  Sleep.setTime(_ms);       // 設定時間
-  Sleep.setMode(_mode);     // 睡眠模式：0 不睡；1 待機狀態；2 wifi睡眠狀態；3 傳統睡眠狀態
-  Serial.print("晚安(");
-  Serial.print(_sleepTime, 3);
-  Serial.println(" s)");
-  Sleep.sleep();
-  Serial.println("起床");
+  String server = "api.thingspeak.com";
+  String _field1 = "&field1=" + _field1Value;
+  String _field2 = "&field2=" + _field2Value;
+  String _field3 = "&field3=" + _field3Value;
+  String getStr = "GET /update?api_key=" + _api + _field1 + _field2 + _field3;
+
+  client.setRootCA(rootCA, sizeof(rootCA));
+  if (client.connect(server.c_str(), 443))
+  {
+    Serial.println("Update to ThingSpeak (GET)");
+    // Make a HTTP request:
+    client.println(getStr);
+    client.println("Host: " + server);
+    client.println("Accept: */*");
+    client.println("Connection: close");
+    client.println();
+    delay(500);
+  }
+
+  while (client.available()) {
+    char c = client.read();
+    Serial.write(c);
+  }
+  client.stop();
+  Serial.println();
 }
 
 
-/**** << WaterBox_V2.1:系統設定相關funtion >> *****
-********************************************************/
+/***** << LinkIt 7697 LASS upload function >> *****
+   LinkIt 7697 WIFI 上傳LASS資料用
+***********************************/
+String addLASS_msgTime()
+{
+  DateTime now = rtc.now();          // 取得目前時間
+  _year = now.year();
+  _month = now.month();
+  _day = now.day();
+  _hour = now.hour();
+  _minute = now.minute();
+  _second = now.second();
+  Tick = now.unixtime() - Tick;
+
+  String _strBuffer = "date=\"" + String(_year) + "-" + convert_2digits(_month) + "-" + convert_2digits(_day) + "\"|time=\"" + convert_2digits(_hour) + ":" + convert_2digits(_minute) + ":" + convert_2digits(_second) + "\"|tick=" + String(Tick);
+  return _strBuffer;
+}
+
+String addLASS_msgValue(float _value[], bool _debug = false)
+{
+  if (_debug)
+  {
+    Serial.print("     Temp: "); Serial.println(_value[0]);
+    Serial.print("       pH: "); Serial.println(_value[1]);
+    Serial.print("       EC: "); Serial.println(_value[2]);
+    Serial.print("Turbidity: "); Serial.println(_value[3]);
+    Serial.print("    Level: "); Serial.println(_value[4]);
+    Serial.print("       DO: "); Serial.println(_value[5]);
+    Serial.print("      ORP: "); Serial.println(_value[6]);
+  }
+  String _strBuffer = "s_t0=" + String(_value[0]) + "|s_ph=" + String(_value[1]) + "|s_ec=" + String(_value[2]) + "|s_Tb=" + String(_value[3]) + "|s_Lv=" + String(_value[4]) + "|s_DO =" + String(_value[5]) + "|s_orp=" + String(_value[6]);
+  return _strBuffer;
+}
+
+bool updateLASS(String _msgTime, String _msgValue)
+{
+  //  "https://data.lass-net.org/Upload/MAPS-secure.php"
+  //  "?topic=LASS/Test/WaterBox_TW&device_id=XXXXXXXXXXXX&key=NoKey&msg="
+  //  "|device=Linkit7697|device_id=\"9C65F920C020\"|ver_app=\"1.1.0\"|app=\"WaterBox_TW\""
+  //  "|FAKE_GPS=1|gps_lat=25.1933|gps_lon = 121.787|"
+  //  "date=\"2019-03-21\"|time=\"06:53:55\"|tick=714436.97"
+  //  "|s_t0=20.00|s_ph=7.00|s_ec=200.0|s_Tb=500|s_Lv=|s_DO=8.0|s_orp=0.0|"
+
+  String Host = "data.lass-net.org";
+  String url = "https://" + Host + "/Upload/MAPS-secure.php";
+  String DeviceID = "Field_D01";
+  String DeviceInfo = "device=Linkit7697|device_id=\"" + DeviceID + "\"|ver_app=\"1.1.0\"|app=\"WaterBox_TW\"";
+  String Location = "FAKE_GPS=1|gps_lat=25.029387|gps_lon=121.579060";
+  String getStr = "GET " + url + "?topic=LASS/Test/WaterBox_TW&device_id=" + DeviceID + "&key=NoKey&msg=|" + DeviceInfo + "|" + Location + "|" + _msgTime + "|" + _msgValue + "|";
+
+  client.setRootCA(rootCA, sizeof(rootCA));
+
+  if (client.connect(Host.c_str(), 443))
+  {
+    Serial.println("Update to LASS (GET)");
+    Serial.println(getStr);
+    // Make a HTTP request:
+    client.println(getStr);
+    client.println("Host : " + Host);
+    client.println("Accept : */*");
+    client.println("Connection: close");
+    client.println();
+    delay(500);
+  }
+  else Serial.println("WIFI Serverconnect error");
+
+  while (client.available()) {
+    char c = client.read();
+    Serial.write(c);
+  }
+  client.stop();
+  Serial.println();
+}
+
+
+/***** << LinkIt 7697 EEPROM function >> *****
+  LinkIt 7697 內部記憶體的讀寫
+  bool EEPROM_write(char* _str, int _page, int _length)
+***********************************/
 bool EEPROM_write(char* _str, int _page, int _length) // 寫入資料，1頁 32 bytes
 {
   int _address = _page * 32;
   if (_length > 31) {                // 超出頁面
-    ToSerial.println("Out Of Pages");
+    Serial.println("Out Of Pages");
     return false;
   }
   else {
-    ToSerial.print("Writing data：");
+    Serial.print("Writing data：");
     for ( int _i = 0; _i < _length; _i++ ) {
       EEPROM.update(_address + _i, _str[_i]);
-      ToSerial.print(_str[_i]);
+      Serial.print(_str[_i]);
     }
-    ToSerial.println();
+    Serial.println();
     return true;
   } // end of if
 } // end of EEPROM_write()
-
 
 String EEPROM_read(int _page, int _length) // 讀取資料，1頁 30 bytes
 {
@@ -568,7 +747,7 @@ String EEPROM_read(int _page, int _length) // 讀取資料，1頁 30 bytes
   String read_buffer = "";
 
   if (_length > 31) {                         // 超出頁面
-    ToSerial.println("Out Of Pages");
+    Serial.println("Out Of Pages");
   }
   else {
     for ( int _i = 0; _i < _length; _i++ ) {
@@ -580,19 +759,20 @@ String EEPROM_read(int _page, int _length) // 讀取資料，1頁 30 bytes
 } // end of EEPROM_read()
 
 
+/***** << System config function >> *****/
 void _config(bool _state = true)
 {
   String _buffer;
   char _char_buffer[30];
 
-  if (_state)  ToSerial.println("讀取設定....");
-  else        ToSerial.println("開始更新設定");
+  if (_state)  Serial.println("讀取設定....");
+  else        Serial.println("開始更新設定");
 
   for (int _i = 0; _i < 6; _i++) {
 
     if (_state) {
-      _buffer = EEPROM_read(_i, 10);    // Linklt 7697 內部的EEPROM
-      ToSerial.print(_buffer);
+      _buffer = EEPROM_read(_i, 10);    // Linklt 7697 內部的EE{ROM)
+      Serial.print(_buffer);
     }
 
     switch (_i) {
@@ -625,17 +805,17 @@ void _config(bool _state = true)
     if (!_state) {
       _buffer.toCharArray(_char_buffer, _buffer.length() + 1);
 
-      ToSerial.print("寫入資料");
-      ToSerial.println(_char_buffer);
+      Serial.print("寫入資料");
+      Serial.println(_char_buffer);
       EEPROM_write(_char_buffer, _i, _buffer.length() + 1);
       delay(50);
     }
     delay(100);
   }
-  ToSerial.print("設定完成");
+  Serial.print("設定完成");
 }
 
-bool alarm_check(float pH, int EC)
+bool alarm_check(float pH, float EC)
 {
   bool _pH_alarm = false, _EC_alarm = false;
   if (pH < 7 - pH_alarm || pH > 7 + pH_alarm)  _pH_alarm = true;
@@ -643,173 +823,284 @@ bool alarm_check(float pH, int EC)
   return _pH_alarm || _EC_alarm;
 }
 
-
-/**** << WaterBox_V2.1:主程式setup設定 >> *****
- *  主程式啟動設定
-*******************************************/
-void setup()
+bool CheckTag(unsigned long * r_tag, unsigned long _ms , bool _debug = false)
 {
-  int _count = 0;
+  bool _result = false;
+  DateTime now = rtc.now();      // 取得目前的時間
 
-  //Switch pin 初始化
-  pinMode(switch_pin, INPUT);
-  delay(100);
-
-  //pH EC 切換用的控制腳位
-  pinMode(USR_pin, OUTPUT);               // 設定EC/pH切換控制IO
-
-  pinMode(LoRa_CS, OUTPUT);      // 手動控制LoRa 的CS
-  digitalWrite(LoRa_CS, HIGH);   // 上拉LoRa SPI 的CS腳位，避免抓到LoRa
-
-  // OLED 初始化
-  u8g2.begin();
-  OLED_status_u8g2("System", "Initialize", 1.0);
-
-  // ToSerial 初始化
-  ToSerial.begin(9600);
-  while (!ToSerial) {
-    _count++;
-    if (_count > 1000) break;
+  if (_debug)
+  {
+    Serial.println("[Tag] Unixtime:" + (String)now.unixtime());
+    Serial.println("[Tag] Tag time:" + (String)*r_tag);
   }
-  OLED_status_u8g2("Serial Port", "CHECKED", 1.0);
 
-  // RTC 初始化
-  if (rtc.lostPower()) {
-    ToSerial.println("RTC lost power, lets set the time!");
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  if (now.unixtime() > *r_tag)
+  {
+    _result = true;                // 更新比對結果
+    *r_tag = now.unixtime() + _ms; // 更新時間戳
+    if (_debug) Serial.println("[Next Tag] " + (String)*r_tag + " (seconds):new");
   }
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
-  // 確認DS18B20模組並設定為準備狀態
-  TempProcess(false);
+  else
+  {
+    _result = false;
+    unsigned long _interval = *r_tag - now.unixtime();
+    if (_debug) Serial.println("[Next Tag] " + (String)*r_tag + " (seconds):" + (String)_interval + " (seconds missing)");
+  }
 
-  // SD card 初始化
-  if (InitSD())  OLED_status_u8g2("SD Module", "CHECKED", 1.0);
-  else           OLED_status_u8g2("SD Module", "FAILED", 1.0);
-
-
-  // LoRa 初始化
-  if (InitLoRa())  OLED_status_u8g2("LoRa Module", "CHECKED", 1.0);
-  else            OLED_status_u8g2("LoRa Module", "FAILED", 1.0);
-
-  OLED_status_u8g2("Loading", "Config", 1.0);
-  _config(true); // 讀取目前的設定
-
-  ToSerial.println("系統設定初始化完成");
-  OLED_status_u8g2("System", "DONE" , 1.0);
-
-
-  // 睡眠測試
-  ToSerial.println(F("睡覺測試"));
-  delay(10);
-  OLED_status_u8g2("Sleep Test", "1 sec" , 1.0);
-  u8g2.setPowerSave(1);
-  enterSleep(1000, 3);
-  u8g2.setPowerSave(0);
-  OLED_status_u8g2("Sleep Test", "wake up" , 1.0);
+  return _result;
 }
 
 
-/**** << WaterBox_V2.1:主程式Loop設定 >> *****
- *  主程式Loo[設定
-*******************************************/
-bool test_code = true;
-void loop() {
-  bool _switch_mode = digitalRead(switch_pin);
+void SystemTest_SD(int _loop)
+{
+  SD.begin(chipSelect);
+  pinMode(10, OUTPUT);      // 手動控制LoRa 的CS
+  digitalWrite(10, HIGH);   // 上拉LoRa SPI 的CS腳位，避免抓到LoRa
 
-  DateTime now = rtc.now();          // 取得目前時間
-  int _year = now.year();
-  int _month = now.month();
-  int _day = now.day();
-  String _days = daysOfTheWeek[now.dayOfTheWeek()];
-  int _hour = now.hour();
-  int _minute = now.minute();
-  bool _SD_save = now.unixtime() % 300 == 0;  //  5分鐘存檔一次
-  bool _upload = now.unixtime() % 1 == 0;   // 10分鐘上傳一次
-  String _str_time = (String)_year + "/" + convert_2digits(_month) + "/" + convert_2digits(_day) + " " + convert_2digits(_hour) + ":" + convert_2digits(_minute);
+  Serial.println("建立資料夾");
+  String _dirName = "Dir-" + String(_loop);
+  SD_checkDir(_dirName);
+  Serial.print("尋找資料夾(" + _dirName + "): ");
+  Serial.println(SD.exists(_dirName));
+  delay(5000);
+}
 
-  //  if (_switch_mode) // 分析模式
-  if (true)
-  {
-    ToSerial.println("分析模式");
+void SystemInitSystem(bool _loadConfig = false)
+{
 
-    pinMode(USR_pin, OUTPUT);     // 用USR pin 控制 pH & EC 模組電源切換
+  Serial.begin(9600);
+  pinMode(modulePower, OUTPUT);     // power_pin 初始化
+  pinMode(modeSwitch, INPUT);       // 模式切換用
+  u8g2.begin();
+  initRTC(false);
+  initADC();
+  delay(100);
+}
 
-    float temperature = temp_value();
-    digitalWrite(USR_pin, HIGH);     // 用USR pin 控制 pH & EC 模組電源切換
-    delay(1000);
+void SystemTest_Sleep(int _ms, int _mode)
+{
+  delay(500);
+  int _result = 0;
+  Sleep.init(true);
 
-    int EC = EC_value(temperature, EC_slop, EC_intercept);
-    digitalWrite(USR_pin, LOW);     // 用USR pin 控制 pH & EC
-    delay(1000);
+  _result = Sleep.setTime(_ms);                   // 設定時間
+  if (_result) _result = Sleep.setMode(_mode);    // 睡眠模式：0 不睡；1 待機狀態；2 wifi睡眠狀態；3 傳統睡眠狀態
+  else Serial.println("鬧鐘設定錯誤");
 
-    String _str_temp = "temp:" + (String)temperature;
-    OLED_result_u8g2(_str_time, _str_temp, "", 1.5);
-
-    String _str_pH;
-    String _str_EC = "EC:" + (String)EC;
-    OLED_result_u8g2(_str_time, _str_pH, _str_EC);
-
-    String _Msg = "";
-
-    if (_SD_save)  {
-      OLED_result_u8g2(_str_time, "Save Data");
-      //      save2SD(_year, _month, _day, _hour, _minute, temperature, pH_Value, EC, pH_mV);
-      delay(500);
-
-    }
-    else delay(1000);
-
-    /*
-      DynamicJsonDocument jsonBuffer;
-      JsonObject root = jsonBuffer.to<JsonObject>();
-
-      root["ID"] = "irrigation_gate_001";                 // 閘門的ID
-
-      //    if (alarm_check(pH_Value, EC)) root["code"] = "U";   // 警報時拉起
-      if (test_code) {                              // 測試用 code
-      root["code"] = "U";
-      test_code = false;
-      }
-      else {
-      root["code"] = "D";                          // 平時拉下
-      test_code = true;
-      }
-      root["time"] = 30;                                // 運轉30秒
-
-      serializeJson(root, _Msg);      // 轉換成String
-      delay(500);
-      /*
-        LoRa.beginPacket();         // send packet
-        LoRa.print(_Msg);
-        LoRa.endPacket();
-    */
+  if (_result) {
+    Serial.println("晚安");
+    Sleep.sleep();
     delay(500);
+    Serial.println("起床");
+  }
+}
 
-    // 把測值輸出到序列埠上
-
-    // 進入睡眠狀態
 
 
-  } // end of if (_switch_mode)
+/***** << Main function: Setup >> *****/
+void setup(void)
+{
+  //power_pin 初始化
+  pinMode(modulePower, OUTPUT);     //
+  digitalWrite(modulePower, HIGH);  // 開啟模組電源
 
+  pinMode(modeSwitch, INPUT);       // 模式切換用
+
+  // OLED 初始化
+  u8g2.begin();
+  OLED_content("System", "Initialize", 1.0, false);
+
+
+  Serial.begin(9600);
+  Serial.println("System Start");
+  OLED_content("Serial Port", "CHECKED", 1.0, false);
+
+  initRTC(true);
+  Serial.println("DS3231 初始化完成");
+
+  // ADS1115 初始化
+  initADC();
+  OLED_content("ADS1115", "Init", 1, false);
+  Serial.println("ADS1115 初始化完成");
+
+  OLED_content("Loading", "System Config", 1.0, false);
+  Serial.println("讀取系統設定");
+  _config(true); // 讀取目前的設定
+
+  Serial.println("系統設定初始化完成");
+  OLED_content("System", "DONE" , 1.0, false);
+
+  pinMode(pinLED, OUTPUT);
+
+  Serial.println("倒數三秒");
+  OLED_content("Sleep", "TEST(3)" , 1.0, true);
+  for (int _i = 0; _i < 3; _i++)
+  {
+    Serial.print(3 - _i);
+    digitalWrite(pinLED, HIGH);
+    delay(500);
+    digitalWrite(pinLED, LOW);
+    delay(500);
+  }
+  Serial.println();
+
+  digitalWrite(modulePower, LOW);  // 關閉模組電源
+  // Sleep功能初始化設定
+  Serial.println("休眠測試");
+  //  SystemTest_Sleep(5000, 3);
+  digitalWrite(pinLED, HIGH);
+  Serial.println("System Init Done");
+
+  digitalWrite(modulePower, HIGH);  // 開啟模組電源
+  OLED_content("Hello", "LASS", 1, false);
+  Serial.println();
+  Serial.println("**************************************");
+  Serial.println();
+  Serial.println(Description_Tittle);
+  Serial.println(Description_Firware);
+  Serial.println("版本功能：");
+  Serial.println("\t" + Description_Features);
+  Serial.println("注意事項：");
+  Serial.println("\t" + Description_Precautions);
+  Serial.println();
+  Serial.println("**************************************");
+  Serial.println();
+
+
+  OLED_content("Connect", "Wifi", 1, false);
+  status = connectWifi(true);
+  if (status == WL_CONNECTED)
+  {
+    printWifiStatus();
+    getLinkItLogo(true);
+  }
+  WiFi.disconnect();
+  Serial.println("End of Setup");
+}
+
+
+/***** << Main function: Loop >> *****/
+void loop() 
+{
+  digitalWrite(modulePower, HIGH); // 開幾電源
+  /*****<< 取得時間資料 >>*****/
+  DateTime now = rtc.now();          // 取得目前時間
+  _minute = now.minute();
+
+  bool _mode = digitalRead(modeSwitch);
+
+  if (_mode)
+  {
+    /*****<< 進入分析運作模式 >>*****/
+    if (_modeStatus != _mode) {
+      Serial.println("**********<< 進入分析模式 >>**********");
+      _modeStatus = _mode;
+    }
+
+    /*****<< 取得時間資料 >>*****/
+    _year = now.year();
+    _month = now.month();
+    _day = now.day();
+    _hour = now.hour();
+    _minute = now.minute();
+    str_Time = convert_2digits(_hour) + ":" + convert_2digits(_minute);
+
+    bool _SD_save = CheckTag( &_SD_tag, 300, false);        //  5分鐘存檔一次
+    bool _upload =  CheckTag( &_upload_tag, 600, false);    // 10分鐘上傳一次
+
+    pinMode(sensorSwitch, OUTPUT);        // 用USR pin 控制 pH & EC 模組電源切換
+
+    digitalWrite(sensorSwitch, HIGH);     // 切換到 pH
+    Temp_value = getTemp();
+    pH_value = getPH(pH_slop, pH_intercept);
+
+    OLED_content_title(str_Time, "pH: " + String(pH_value), "Temp: " + String(Temp_value), "Analysis Mode", 1.5, false);
+
+    digitalWrite(sensorSwitch, LOW);     // 切換到 EC
+    EC_value = getEC(EC_slop, EC_intercept);
+    if ( alarm_check(pH_value, EC_value))  alarmStr = "Alarm";
+    else                                  alarmStr = "";
+
+    OLED_content_title(str_Time, "EC: " + String(EC_value), alarmStr, "Analysis Mode", 1.5, true);
+
+    if (_SD_save)
+    {
+      OLED_content_title(str_Time, "SD", "Saving", "Analysis Mode", 1.0, false);
+      str_Time = (String)_year + "-" + convert_2digits(_month) + "-" + convert_2digits(_day) + " " + str_Time;
+      CSV_fileName = convert_2digits(_month) + convert_2digits(_day);
+      CSV_Header   = "Date,Temp,pH,EC";
+      CSV_Data = str_Time + "," + String(Temp_value) + "," + String(pH_value) + "," + String(EC_value);
+      SavingData(CSV_fileName, CSV_Data);     //  寫入CSV
+    }
+
+    if (_upload)
+    {
+      connectWifi();
+
+      SensorValue[0] = Temp_value;
+      SensorValue[1] = pH_value;
+      SensorValue[2] = EC_value;
+      SensorValue[3] = 0.0;
+      SensorValue[4] = 0.0;
+      SensorValue[5] = 0.0;
+      SensorValue[7] = 0.0;
+
+      String MQTT_Time = addLASS_msgTime();
+      String MQTT_Value = addLASS_msgValue(SensorValue, true);
+      updateLASS(MQTT_Time, MQTT_Value);
+      updateThingSpeak("Q64MKY9THK7PRRSU",String(Temp_value),String(pH_value),String(EC_value));
+      WiFi.disconnect();
+    }
+
+    digitalWrite(modulePower, LOW);         // 關閉電源
+    int _delayTime = (4 * 60 + 30) * 1000;
+    delay(_delayTime);
+
+  } // end of if (_mode)
+
+
+  /*****<< 進入系統設定模式 >>*****/
   else {
-    pinMode(USR_pin, INPUT);                                      // 用USR pin 作為按鈕輸入
-    unsigned long printTime = millis();                            // Serial印出時間計時器
-    float _time = pull_time(USR_pin, 3);                           // 設定按鈕計時器
-    String _state_str, _config_str;                                // Serial輸出用
-    String _state_OLDE_1, _state_OLDE_2, _state_str_OLED;             // OLED 顯示用
+    if (_modeStatus != _mode) {
+      Serial.println("**********<< 進入設定模式 >>**********");
+      _modeStatus = _mode;
+    }
 
-    if (_time > 0 && _time < 1) {       // 切換子項目
+    pinMode(sensorSwitch, INPUT);                                  // 用USR pin 作為按鈕輸入
+    unsigned long printTime = millis();                            // Serial印出時間計時器
+    float _time = pull_time(sensorSwitch, 3);                      // 設定按鈕計時器
+    String _state_str, _config_str;                                // Serial輸出用String
+    String _state_OLDE_1, _state_OLDE_2, _state_str_OLED;          // OLED 顯示用String
+
+    /*****<< 取得ADS1115狀態 >>*****/
+
+    adc0 = ads.readADC_SingleEnded(EC_pin);
+    delay(100);
+    adc1 = ads.readADC_SingleEnded(pH_pin);
+    delay(100);
+    adc2 = ads.readADC_SingleEnded(Rotary_Pin_1);
+    delay(100);
+    adc3 = ads.readADC_SingleEnded(Rotary_Pin_2);
+    delay(100);
+    //    Serial.print("AIN0: "); Serial.println(adc0);
+    //    Serial.print("AIN1: "); Serial.println(adc1);
+    //    Serial.print("AIN2: "); Serial.println(adc2);
+    //    Serial.print("AIN3: "); Serial.println(adc3);
+    //    Serial.println();
+
+    /***************************
+       檢查按鈕按下的時間，切換模式
+     ***************************/
+    if (_time > 0 && _time < 1) {       // 按下時間大於<1秒時，切換子項目
       if (item == 3) item = 0;          // 到最後一項時跳回第一項
       else item += 1;                   // 跳到下一項
     }
-    else if (_time > 1 && _time < 2) {  // 切換大項目
+    else if (_time > 1 && _time < 2) {  // 按下時間大於1~2秒時，切換大項目
       if (chapter == 1) chapter = 0;    // 到最後一項時跳回第一項
       else chapter += 1;                // 跳到下一項
     }
-    else if (_time >= 3) {              // 切換設定顯示/調整
+    else if (_time >= 3) {              // 按下時間大於3秒時，儲存設定資料 / 進入設定模式
       if (config_state) config_state = false;                          // 切換到設定調整狀態
       else  {                                                          // 切回設定顯示狀態
         config_state = true;
@@ -818,15 +1109,22 @@ void loop() {
       }
     }
 
-    if (printTime % print_interval <= print_interval * 0.05) {
+    /***************************
+       檢查是不是要在監控埠顯示訊息
+     ***************************/
+    if (printTime % print_interval <= print_interval * 0.05)
+    {
       if (config_state) {
-        ToSerial.println("設定模式：顯示目前設定");
+        Serial.println("設定模式：顯示目前設定");
       }
       else {
-        ToSerial.println("設定模式：調整設定");
+        Serial.println("設定模式：調整設定");
       }
     }
-    // 顯示目前的項目
+
+    /***************************
+       更新要顯示的String內容
+     ***************************/
     switch (item) {
       case 0:
         if (chapter) {
@@ -848,8 +1146,8 @@ void loop() {
           }
           else {                // 用可變電阻調整目前年分
             _state_str = "設定年分";
-            //            int _year_1 = (int)_analog_convert(Rotary_Pin_1, 9);
-            //            int _year_2 = (int)_analog_convert(Rotary_Pin_2, 9);
+            int _year_1 = (int)_analog_convert(adc2, 9);         // VR1設定 年分 10位數
+            int _year_2 = (int)_analog_convert(adc3, 9);         // VR2設定 年分 個位數
             _YY = 2000 + _year_1 * 10 + _year_2;
             _config_str = (String) _YY;
             _state_str_OLED = "Setting Year";
@@ -866,8 +1164,8 @@ void loop() {
           }
           else {                // 用可變電阻設定參數
             _state_str = "設定pH斜率截距";
-            //            pH_slop = 0.8 + _analog_convert(Rotary_Pin_1, 400) * 0.001;
-            //            pH_intercept = -0.5 + _analog_convert(Rotary_Pin_2, 100) * 0.01;
+            pH_slop = 0.8 + _analog_convert(adc2, 400) * 0.001;         // VR1設定 pH 斜率
+            pH_intercept = -0.5 + _analog_convert(adc3, 100) * 0.01;    // VR2設定 pH 截距
             _config_str = "pH slope:" + (String)pH_slop + "\t pH intercept：" + (String)pH_intercept;
             _state_str_OLED = "Setting pH's config";
             _state_OLDE_1 = "slop: " + (String)pH_slop;
@@ -886,8 +1184,8 @@ void loop() {
           }
           else {                // 用可變電阻調整日期
             _state_str = "日期設定(MM/DD)";
-            //            _MM = (int)_analog_convert(Rotary_Pin_1, 11) + 1;
-            //            _DD = (int)_analog_convert(Rotary_Pin_2, 30) + 1;
+            _MM = (int)_analog_convert(adc2, 11) + 1;               // VR1設定 月份 MM
+            _DD = (int)_analog_convert(adc3, 30) + 1;               // VR2設定 日期 DD
             _config_str = convert_2digits(_MM) + "/" + convert_2digits(_DD);
             _state_str_OLED = "Setting Date";
             _state_OLDE_1 = "Month: " + convert_2digits(_MM);
@@ -904,8 +1202,8 @@ void loop() {
           }
           else {                // 用可變電阻設定參數
             _state_str = "設定EC斜率截距";
-            //            EC_slop = 0.8 + _analog_convert(Rotary_Pin_1, 400) * 0.001;
-            //            EC_intercept = _analog_convert(Rotary_Pin_2, 1000) - 500;
+            EC_slop = 0.8 + _analog_convert(adc2, 400) * 0.001; // VR1設定 EC 斜率
+            EC_intercept = _analog_convert(adc3, 1000) - 500;   // VR2設定 EC 截距
             _config_str = "EC斜率:" + (String)EC_slop + "\t EC截距：" + (String)EC_intercept;
             _state_str_OLED = "Setting EC's config";
             _state_OLDE_1 = "slop: " + (String)EC_slop;
@@ -924,8 +1222,8 @@ void loop() {
           }
           else {                // 用可變電阻調整目前時間
             _state_str = "時間設定(HH:MM)";
-            //            _HH = (int)_analog_convert(Rotary_Pin_1, 23);
-            //            _mm = (int)_analog_convert(Rotary_Pin_2, 59) + 1;
+            _HH = (int)_analog_convert(adc2, 23);           // VR1設定 小時HH
+            _mm = (int)_analog_convert(adc3, 59) + 1;       // VR2設定 分鐘mm
             _config_str = convert_2digits(_HH) + ":" + convert_2digits(_mm);
             _state_str_OLED = "SettingTime(HH:MM)";
             _state_OLDE_1 = "Hours: " + (String)_HH;
@@ -937,29 +1235,31 @@ void loop() {
             _state_str = "上下限顯示";
             _config_str = "pH上下限:±" + (String)pH_alarm + "\t EC上限：" + (String)EC_alarm;
             _state_str_OLED = "Show the limit";
-            _state_OLDE_1 = "pH's limit: " + (String)(7 - pH_alarm) + "-" + (String)(7 + pH_alarm);
-            _state_OLDE_2 = "EC's limit: " + (String)EC_alarm;
+            _state_OLDE_1 = "pH's : " + (String)(7 - pH_alarm) + "-" + (String)(7 + pH_alarm);
+            _state_OLDE_2 = "EC's : " + (String)EC_alarm;
           }
           else {
             _state_str = "上下限設定";
-            //            pH_alarm = _analog_convert(Rotary_Pin_1, 20) * 0.1;
-            //            EC_alarm = _analog_convert(Rotary_Pin_2, 1000);
+            pH_alarm = _analog_convert(adc2, 20) * 0.1; // VR1設定 pH 上限
+            EC_alarm = _analog_convert(adc3, 1000);     // VR2設定 EC 上限
             _config_str = "pH上下限:7.00±" + (String)pH_alarm + "\t EC上限：" + (String)EC_alarm;
             _state_str_OLED = "Setting limit";
-            _state_OLDE_1 = "pH's limit: " + (String)(7 - pH_alarm) + "-" + (String)(7 + pH_alarm);
-            _state_OLDE_2 = "EC's limit: " + (String)EC_alarm;
+            _state_OLDE_1 = "pH's : " + (String)(7 - pH_alarm) + "-" + (String)(7 + pH_alarm);
+            _state_OLDE_2 = "EC's : " + (String)EC_alarm;
           }
         }
         break;
     }
 
+    /***************************
+       每1秒顯示依次目前設定
+     ***************************/
     if (printTime % print_interval <= print_interval * 0.05 ) {
-      ToSerial.println("目前頁面:" + (String)chapter + "-" + (String)item);
-      ToSerial.println("\t " + _state_str);
-      ToSerial.println("\t 目前設定：" + _config_str);
-      ToSerial.println("*******************************\n\r\n\r ");
+      Serial.println("目前頁面:" + (String)chapter + "-" + (String)item);
+      Serial.println("\t " + _state_str);
+      Serial.println("\t 目前設定：" + _config_str);
+      Serial.println("*******************************\n\r\n\r ");
     }
-
-    OLED_setting_u8g2(_state_str_OLED, _state_OLDE_1, _state_OLDE_2, 0.0);
+    OLED_smallContent(_state_OLDE_1, _state_OLDE_2, _state_str_OLED, 0.1, false);
   } //end of 設定模式
 }

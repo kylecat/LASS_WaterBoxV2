@@ -9,7 +9,7 @@
 #include "LSleep.h"
 
 #include <hal_sleep_manager.h>
-
+#define configUSE_TICKLESS_IDLE    2
 
 LSleepClass LSleep;
 
@@ -26,10 +26,10 @@ LSleepClass::LSleepClass()
 void LSleepClass::init(bool _debug)
 {
   _debugInfo = _debug;
-  
+
   _headleIndex =  hal_sleep_manager_get_lock_status();
   hal_sleep_manager_release_sleep_handle(_headleIndex);
-  
+
   if (hal_sleep_manager_init() == HAL_SLEEP_MANAGER_ERROR)
   {
     // Check the log for error handling.
@@ -65,27 +65,32 @@ int LSleepClass::setTime(uint32_t _ms)
 */
 int LSleepClass::setMode(uint8_t _mode)
 {
-  _sleep_mode = _mode;
+  
   int _state;
-  switch (_sleep_mode) {
+  switch (_mode) {
     case 0:
       if (_debugInfo) Serial.println("[SleepManager] Sleep Mode: NONE");
+      _sleep_mode = HAL_SLEEP_MODE_NONE;
       _state = 1;
       break;
     case 1:
       if (_debugInfo) Serial.println("[SleepManager] Sleep Mode: IDEL");
+      _sleep_mode = HAL_SLEEP_MODE_IDLE;
       _state = 1;
       break;
     case 2:
       if (_debugInfo) Serial.println("[SleepManager] Sleep Mode: SLEEP");
+      _sleep_mode = HAL_SLEEP_MODE_SLEEP;
       _state = 1;
       break;
     case 3:
       if (_debugInfo) Serial.println("[SleepManager] Sleep Mode: LEGACY_SLEEP");
+      _sleep_mode = HAL_SLEEP_MODE_LEGACY_SLEEP;
       _state = 1;
       break;
     case 4:
       if (_debugInfo) Serial.println("[SleepManager] Sleep Mode: NUMBER");
+      _sleep_mode = HAL_SLEEP_MODE_NUMBER;
       _state = 1;
       break;
     default:
@@ -95,9 +100,19 @@ int LSleepClass::setMode(uint8_t _mode)
   return _state;
 }
 
+
+
+/*
+   進入睡眠
+*/
 int LSleepClass::sleep()
 {
-  int _state;
+  int _state = 0;
+
+  if (hal_sleep_manager_init() == HAL_SLEEP_MANAGER_ERROR)
+  {
+    return _state;
+  }
 
   _headleIndex =  hal_sleep_manager_get_lock_status();
   if (_debugInfo) Serial.println("[SleepManager] Handle Index:" + String(_headleIndex));
@@ -107,7 +122,6 @@ int LSleepClass::sleep()
   if (hal_sleep_manager_is_sleep_locked())
   {
     if (_debugInfo) Serial.println("[SleepManager] Cannot enter the sleep mode, as the sleep is locked");
-
     _state = 0;
   } else if (hal_sleep_manager_set_sleep_time(_sleep_time) == HAL_SLEEP_MANAGER_OK)
   {
