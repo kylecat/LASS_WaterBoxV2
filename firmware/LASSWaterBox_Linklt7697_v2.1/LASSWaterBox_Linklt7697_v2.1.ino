@@ -104,6 +104,7 @@ RTC_DS3231 rtc;
 #define DS18B20_Pin 7
 #include <DS18B20.h>
 uint8_t address[] = {40, 250, 31, 218, 4, 0, 0, 52};
+uint8_t selected;
 
 
 /**** << WaterBox_V2.1:pin state test with ADS1115 >> *****
@@ -153,7 +154,7 @@ int print_interval = 1000;
 int _c = 0;
 float Temp_value, pH_value, EC_value, Tubidity_value;
 float SensorValue[7] = {0};
-bool _modeStatus = true;
+bool _modeStatus = false;
 
 int chapter = 0;                               //  大項目：0~1(校正設定,時間設定)
 int item = 0;                                  //  子項目：0~3(準備,參數1設定,參數2設定,參數3設定)
@@ -507,8 +508,18 @@ float getEC(float slope = 1.0, float intercept = 0.0)
 
 float getTemp(void)
 {
+  float _result = 0;
   DS18B20 ds(DS18B20_Pin);
-  return ds.getTempC();
+
+  selected = ds.select(address);
+
+  if (selected) {
+    _result = ds.getTempC();
+  } else {
+    Serial.println("Device not found!");
+  }
+
+  return _result;
 }
 
 
@@ -553,12 +564,12 @@ int connectWifi(bool _debug = false)
 
   }
 
-  for (int _c = 0;_c<2;_c++){
+  for (int _c = 0; _c < 2; _c++) {
     if (status != WL_CONNECTED)
     {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(ssid);
-    status = WiFi.begin(ssid, pass);
+      Serial.print("Attempting to connect to SSID: ");
+      Serial.println(ssid);
+      status = WiFi.begin(ssid, pass);
     }
   }
   return WiFi.status();
@@ -981,15 +992,18 @@ void setup(void)
 
 
 /***** << Main function: Loop >> *****/
-void loop() 
+void loop()
 {
-  digitalWrite(modulePower, HIGH); // 開幾電源
+  digitalWrite(modulePower, HIGH);    // 開啟模組電源
   /*****<< 取得時間資料 >>*****/
   DateTime now = rtc.now();          // 取得目前時間
+  _year = now.year();
+  _month = now.month();
+  _day = now.day();
+  _hour = now.hour();
   _minute = now.minute();
 
   bool _mode = digitalRead(modeSwitch);
-
   if (_mode)
   {
     /*****<< 進入分析運作模式 >>*****/
@@ -997,13 +1011,7 @@ void loop()
       Serial.println("**********<< 進入分析模式 >>**********");
       _modeStatus = _mode;
     }
-
-    /*****<< 取得時間資料 >>*****/
-    _year = now.year();
-    _month = now.month();
-    _day = now.day();
-    _hour = now.hour();
-    _minute = now.minute();
+    /*****<< 更新時間資料 >>*****/
     str_Time = convert_2digits(_hour) + ":" + convert_2digits(_minute);
 
     bool _SD_save = CheckTag( &_SD_tag, 300, false);        //  5分鐘存檔一次
@@ -1020,7 +1028,24 @@ void loop()
     digitalWrite(sensorSwitch, LOW);     // 切換到 EC
     EC_value = getEC(EC_slop, EC_intercept);
     if ( alarm_check(pH_value, EC_value))  alarmStr = "Alarm";
-    else                                  alarmStr = "";
+    else                                   alarmStr = "";
+
+    Serial.print("***** 測值");
+    Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(" ");
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.println(" *****");
+    Serial.println("pH\t" + String(pH_value));
+    Serial.println("Temp\t" + String(Temp_value));
+    Serial.println("EC\t" + String(EC_value));
+    Serial.println("Alarm\t" + alarmStr);
+
 
     OLED_content_title(str_Time, "EC: " + String(EC_value), alarmStr, "Analysis Mode", 1.5, true);
 
@@ -1049,7 +1074,7 @@ void loop()
       String MQTT_Time = addLASS_msgTime();
       String MQTT_Value = addLASS_msgValue(SensorValue, true);
       updateLASS(MQTT_Time, MQTT_Value);
-      updateThingSpeak("Q64MKY9THK7PRRSU",String(Temp_value),String(pH_value),String(EC_value));
+      updateThingSpeak("Q64MKY9THK7PRRSU", String(Temp_value), String(pH_value), String(EC_value));
       WiFi.disconnect();
     }
 
