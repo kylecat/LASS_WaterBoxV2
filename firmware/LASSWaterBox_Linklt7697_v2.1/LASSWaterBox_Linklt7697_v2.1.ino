@@ -169,7 +169,7 @@ String CSV_fileName; // 檔案名稱(需少於8個字元)
 String CSV_Data;     // CSV資料
 String str_Time;     // 資料寫入時的時間  "YYYY-MM-DD mm:hh"
 
-unsigned  long _SD_tag, _upload_tag;  // 用來記錄要不要寫入SD卡/上傳雲端的時間戳
+unsigned  long _SD_tag, _upload_tag, _delay_tag;  // 用來記錄要不要寫入SD卡/上傳雲端的時間戳
 
 String alarmStr;                      // 用來記錄要不要顯示alarm
 
@@ -668,7 +668,7 @@ String addLASS_msgTime()
   _second = now.second();
   Tick = now.unixtime() - Tick;
 
-  String _strBuffer = "date=\"" + String(_year) + "-" + convert_2digits(_month) + "-" + convert_2digits(_day) + "\"|time=\"" + convert_2digits(_hour) + ":" + convert_2digits(_minute) + ":" + convert_2digits(_second) + "\"|tick=" + String(Tick);
+  String _strBuffer = "date=" + String(_year) + "-" + convert_2digits(_month) + "-" + convert_2digits(_day) + "|time=" + convert_2digits(_hour) + ":" + convert_2digits(_minute) + ":" + convert_2digits(_second) + "|tick=" + String(Tick);
   return _strBuffer;
 }
 
@@ -688,21 +688,43 @@ String addLASS_msgValue(float _value[], bool _debug = false)
   return _strBuffer;
 }
 
+String WifiMac(bool _hasDash = false, bool _fullMac = false)
+{
+  String _dash;
+  if (_hasDash) _dash = "-";
+  byte mac[6];
+  WiFi.macAddress(mac);
+  String _macAddress;
+
+  int _stop = 2;
+  if (_fullMac) _stop = -1;
+  
+  for (int _i = 5 ; _i > _stop; _i--)
+  {
+    if (_i == _stop + 1) _dash = "";
+    _macAddress = _macAddress + String(mac[_i], HEX) + _dash;
+  }
+
+  //  Serial.println("MAC Address: "+_macAddress);   // 檢查用
+
+  return _macAddress;
+}
+
 bool updateLASS(String _msgTime, String _msgValue)
 {
   //  "https://pm25.lass-net.org/Upload/waterbox_tw.php"
   //  "?topic=LASS/Test/WaterBox_TW&device_id=XXXXXXXXXXXX&key=NoKey&msg="
-  //  "|device=Linkit7697|device_id=\"9C65F920C020\"|ver_app=\"1.1.0\"|app=\"WaterBox_TW\""
+  //  "|device=Linkit7697|device_id=9C65F920C020|ver_app=1.1.0|app=WaterBox_TW"
   //  "|FAKE_GPS=1|gps_lat=25.1933|gps_lon = 121.787|"
-  //  "date=\"2019-03-21\"|time=\"06:53:55\"|tick=714436.97"
+  //  "date=2019-03-21|time=06:53:55|tick=714436.97"
   //  "|s_t0=20.00|s_ph=7.00|s_ec=200.0|s_Tb=500|s_Lv=|s_DO=8.0|s_orp=0.0|"
 
   String Host = "pm25.lass-net.org";
   String url = "https://" + Host + "/Upload/waterbox_tw.php";
-  String DeviceID = "Field_D01";
-  String DeviceInfo = "device=Linkit7697|device_id=\"" + DeviceID + "\"|ver_app=\"1.1.0\"|app=\"WaterBox_TW\"";
+  String DeviceID = "Field_D01_" + WifiMac();
+  String DeviceInfo = "device=Linkit7697|device_id=" + DeviceID + "|ver_app=" + _fw + "|app=WaterBox_TW";
   String Location = "FAKE_GPS=1|gps_lat=25.029387|gps_lon=121.579060";
-  String getStr = "GET " + url + "?topic=LASS/Test/WaterBox_TW&device_id=" + DeviceID + "&key=NoKey&msg=|" + DeviceInfo + "|" + Location + "|" + _msgTime + "|" + _msgValue + "|";
+  String getStr = "GET " + url + "?topic=WaterBox_TW&device_id=" + DeviceID + "&key=NoKey&msg=|" + DeviceInfo + "|" + Location + "|" + _msgTime + "|" + _msgValue + "|";
 
   client.setRootCA(rootCA, sizeof(rootCA));
 
@@ -1004,6 +1026,7 @@ void loop()
   _minute = now.minute();
 
   bool _mode = digitalRead(modeSwitch);
+
   if (_mode)
   {
     /*****<< 進入分析運作模式 >>*****/
@@ -1016,38 +1039,39 @@ void loop()
 
     bool _SD_save = CheckTag( &_SD_tag, 300, false);        //  5分鐘存檔一次
     bool _upload =  CheckTag( &_upload_tag, 600, false);    // 10分鐘上傳一次
+    bool _delay = CheckTag( &_delay_tag, 150, false);        // 1分30秒鐘醒來一次
+    if (_delay)
+    {
+      pinMode(sensorSwitch, OUTPUT);        // 用USR pin 控制 pH & EC 模組電源切換
 
-    pinMode(sensorSwitch, OUTPUT);        // 用USR pin 控制 pH & EC 模組電源切換
+      digitalWrite(sensorSwitch, HIGH);     // 切換到 pH
+      Temp_value = getTemp();
+      pH_value = getPH(pH_slop, pH_intercept);
 
-    digitalWrite(sensorSwitch, HIGH);     // 切換到 pH
-    Temp_value = getTemp();
-    pH_value = getPH(pH_slop, pH_intercept);
+      OLED_content_title(str_Time, "pH: " + String(pH_value), "Temp: " + String(Temp_value), "Analysis Mode", 1.5, false);
 
-    OLED_content_title(str_Time, "pH: " + String(pH_value), "Temp: " + String(Temp_value), "Analysis Mode", 1.5, false);
+      digitalWrite(sensorSwitch, LOW);     // 切換到 EC
+      EC_value = getEC(EC_slop, EC_intercept);
+      if ( alarm_check(pH_value, EC_value))  alarmStr = "Alarm";
+      else                                   alarmStr = "";
 
-    digitalWrite(sensorSwitch, LOW);     // 切換到 EC
-    EC_value = getEC(EC_slop, EC_intercept);
-    if ( alarm_check(pH_value, EC_value))  alarmStr = "Alarm";
-    else                                   alarmStr = "";
-
-    Serial.print("***** 測值");
-    Serial.print(now.year(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.day(), DEC);
-    Serial.print(" ");
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.println(" *****");
-    Serial.println("pH\t" + String(pH_value));
-    Serial.println("Temp\t" + String(Temp_value));
-    Serial.println("EC\t" + String(EC_value));
-    Serial.println("Alarm\t" + alarmStr);
-
-
-    OLED_content_title(str_Time, "EC: " + String(EC_value), alarmStr, "Analysis Mode", 1.5, true);
+      Serial.print("***** 測值");
+      Serial.print(now.year(), DEC);
+      Serial.print('/');
+      Serial.print(now.month(), DEC);
+      Serial.print('/');
+      Serial.print(now.day(), DEC);
+      Serial.print(" ");
+      Serial.print(now.hour(), DEC);
+      Serial.print(':');
+      Serial.print(now.minute(), DEC);
+      Serial.println(" *****");
+      Serial.println("pH\t" + String(pH_value));
+      Serial.println("Temp\t" + String(Temp_value));
+      Serial.println("EC\t" + String(EC_value));
+      Serial.println("Alarm\t" + alarmStr);
+      OLED_content_title(str_Time, "EC: " + String(EC_value), alarmStr, "Analysis Mode", 1.5, true);
+    }
 
     if (_SD_save)
     {
@@ -1079,7 +1103,7 @@ void loop()
     }
 
     digitalWrite(modulePower, LOW);         // 關閉電源
-    int _delayTime = (4 * 60 + 30) * 1000;
+    int _delayTime = (4 * 60 + 40) * 1000;
     delay(_delayTime);
 
   } // end of if (_mode)
