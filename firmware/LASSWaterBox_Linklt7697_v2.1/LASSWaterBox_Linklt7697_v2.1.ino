@@ -132,7 +132,7 @@ int16_t adc0, adc1, adc2, adc3;
 
 
 /***** << firmware Version >> *****/
-String _fw = "Ver 2.1.b";
+String _fw = "Ver 2.1.c";
 String Description_Tittle = ">> LASS IS YOURS <<";
 
 String Description_Firware = "The DEVICE FIRWARE: " + String(_fw);
@@ -690,15 +690,15 @@ String addLASS_msgValue(float _value[], bool _debug = false)
 
 bool updateLASS(String _msgTime, String _msgValue)
 {
-  //  "https://data.lass-net.org/Upload/MAPS-secure.php"
+  //  "https://pm25.lass-net.org/Upload/waterbox_tw.php"
   //  "?topic=LASS/Test/WaterBox_TW&device_id=XXXXXXXXXXXX&key=NoKey&msg="
   //  "|device=Linkit7697|device_id=\"9C65F920C020\"|ver_app=\"1.1.0\"|app=\"WaterBox_TW\""
   //  "|FAKE_GPS=1|gps_lat=25.1933|gps_lon = 121.787|"
   //  "date=\"2019-03-21\"|time=\"06:53:55\"|tick=714436.97"
   //  "|s_t0=20.00|s_ph=7.00|s_ec=200.0|s_Tb=500|s_Lv=|s_DO=8.0|s_orp=0.0|"
 
-  String Host = "data.lass-net.org";
-  String url = "https://" + Host + "/Upload/MAPS-secure.php";
+  String Host = "pm25.lass-net.org";
+  String url = "https://" + Host + "/Upload/waterbox_tw.php";
   String DeviceID = "Field_D01";
   String DeviceInfo = "device=Linkit7697|device_id=\"" + DeviceID + "\"|ver_app=\"1.1.0\"|app=\"WaterBox_TW\"";
   String Location = "FAKE_GPS=1|gps_lat=25.029387|gps_lon=121.579060";
