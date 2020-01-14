@@ -268,7 +268,7 @@ https://makerpro.cc/2016/02/upload-sensor-data-from-ameba-to-thingspeak/
 
 # **7. 第一次就上手**
 ## **7.1 購買**
-- 到ICShop買(見[+Task-水盒子組裝說明書: 4.-購買](https://paper.dropbox.com/doc/Task-4.-gMGZS1OGSWaFkNvnUZOKw#:uid=675327873832735554745282&amp;h2=4.-%E8%B3%BC%E8%B2%B7) )
+- 到ICShop買(見[4.-購買](https://github.com/kylecat/LASS_WaterBoxV2/blob/master/README.md#4-%E8%B3%BC%E8%B2%B7) )
 ## **7.2 組裝**
 - ICShop 將會提供代客組裝服務 (當然會需要收組裝費用)
 - 須留意的細節
