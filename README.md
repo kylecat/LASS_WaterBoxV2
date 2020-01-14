@@ -281,7 +281,7 @@ https://makerpro.cc/2016/02/upload-sensor-data-from-ameba-to-thingspeak/
     - 連接電池、太陽能板的接頭，先把開關關閉
             (最後再送電的觀念很重要)
     - 各模組的單元測試都跑一遍，確認畫面/序列埠顯示正常
-            (見[+Task-水盒子組裝說明書: 3.4-單元功能測試](https://paper.dropbox.com/doc/Task-3.4-gMGZS1OGSWaFkNvnUZOKw#:uid=181979475095556666883844&amp;h2=3.4-%E5%96%AE%E5%85%83%E5%8A%9F%E8%83%BD%E6%B8%AC%E8%A9%A6) )
+            (見[3.4-單元功能測試](https://github.com/kylecat/LASS_WaterBoxV2/blob/master/README.md#34-%E5%96%AE%E5%85%83%E5%8A%9F%E8%83%BD%E6%B8%AC%E8%A9%A6) )
 ![](https://paper-attachments.dropbox.com/s_3CC555A8CFF3D8CDA00E57144922BAEC389C3029AF20AB1D8E5FA1CA7DB99776_1577686559596_.png)
 
 ## **7.3 充電/開機**
