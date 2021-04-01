@@ -68,7 +68,7 @@ WiFiClient mqtt_client; // HTTP 用 Client
 #include <PubSubClient.h>  // MQTT library
 PubSubClient mqtt(mqtt_client);
 #include <String.h>
-#define SERVER_IP "140.112.65.164"
+#define SERVER_IP "0.0.0.0" #MQTT broker
 #define SERVER_PORT 1883
 #define USERNAME ""
 #define PASSWORD ""
