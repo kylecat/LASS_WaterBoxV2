@@ -1,6 +1,6 @@
 /***** << WaterBox_V2.0:pin state test with ADS1115 >> *****
    ADC 數據及 switch切換
-   使用Library Adafruit_ADS1X15 (Ver. 1.0.1)
+   使用Library Adafruit_ADS1X15 (Ver. 1.1.0~Ver. 1.1.2)
 ***********************************************************/
 #include <Wire.h>
 #include <Adafruit_ADS1015.h>
@@ -49,7 +49,7 @@ float _analog_convert(uint8_t pin, int _val)
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(switch_pin, INPUT);
   pinMode(USR_pin, INPUT);
@@ -63,7 +63,6 @@ void setup()
     pinMode(VR_1, INPUT);
     pinMode(VR_2, INPUT);
   *****<< 這是舊的pin設定 >>*****************/
-    ads.begin(); //放到systemPower()裡面
 
 
   // The ADC input range (or gain) can be changed via the following
@@ -101,28 +100,35 @@ void loop() {
   int _EC = ads.readADC_SingleEnded(1);
   int _R1 = ads.readADC_SingleEnded(2);
   int _R2 = ads.readADC_SingleEnded(3);
-  //  float _PH = _pH *0.125;
-  //  float _EC = _ec *0.125;
 
+  
+  Serial.print("SW1:");
   Serial.print(_SW);
-  Serial.print("\t");
+  Serial.print("  ");
+  Serial.print("SW2/USR:");
   Serial.print(_USR);
   Serial.print("\t");
-  //  Serial.print(_R1); Serial.print("(" + String(_R1 * 0.125, 2) + "mV)");
-  //  Serial.print("\t");
-  //  Serial.print(_R2); Serial.print("(" + String(_R2 * 0.125, 2) + "mV)");
-  //  Serial.print("\t");
-  Serial.print(_pH); Serial.print("(" + String(_pH * 0.125, 2) + "mV)");
+  
+  Serial.print("pH: ");
+  Serial.print(_pH); Serial.print(" (" + String(_pH * 0.125, 2) + "mV)");
   Serial.print("\t");
-  Serial.print(_EC); Serial.print("(" + String(_EC * 0.125, 2) + "mV)");
-  Serial.println();
+  
+  Serial.print("EC: ");
+  Serial.print(_EC); Serial.print(" (" + String(_EC * 0.125, 2) + "mV)");
+  Serial.print("\t");
 
-  float test_VR1 = _analog_convert(2, 50);
-  float test_VR2 = _analog_convert(3, 200);
-  Serial.print("VR1:\t");
-  Serial.print(test_VR1);
-  Serial.print("\tVR2:\t");
-  Serial.println(test_VR2);
+  int range_VR1 = 50;
+  int range_VR2 = 200;
+  float test_VR1 = _analog_convert(2, range_VR1);
+  float test_VR2 = _analog_convert(3, range_VR2);
+  
+  Serial.print("VR1: ");Serial.print(_R1); Serial.print(" (");
+  Serial.print(test_VR1);Serial.print("/");Serial.print(range_VR1);Serial.print(")");
+  
+  Serial.print("\tVR2: ");Serial.print(_R2); Serial.print(" (");
+  Serial.print(test_VR2);Serial.print("/");Serial.print(range_VR2);Serial.print(")");
+
+  Serial.println();
 
   delay(500);  // 時間間隔太少會導致錯位
 
