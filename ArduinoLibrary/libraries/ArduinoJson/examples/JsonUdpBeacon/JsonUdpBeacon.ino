@@ -1,14 +1,14 @@
 // ArduinoJson - arduinojson.org
-// Copyright Benoit Blanchon 2014-2020
+// Copyright Benoit Blanchon 2014-2019
 // MIT License
 //
 // This example shows how to send a JSON document to a UDP socket.
 // At regular interval, it sends a UDP packet that contains the status of
 // analog and digital pins.
-// It looks like that:
+// The JSON document looks like the following:
 // {
-//   "analog": [0, 76, 123, 158, 192, 205],
-//   "digital": [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0]
+//   "analog": [ 0, 1, 2, 3, 4, 5 ],
+//   "digital": [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 ]
 // }
 //
 // If you want to test this program, you need to be able to receive the UDP
@@ -16,8 +16,6 @@
 // For example, you can run netcat on your computer
 // $ ncat -ulp 8888
 // See https://nmap.org/ncat/
-//
-// https://arduinojson.org/v6/example/udp-beacon/
 
 #include <ArduinoJson.h>
 #include <Ethernet.h>
@@ -45,12 +43,15 @@ void setup() {
 }
 
 void loop() {
-  // Allocate a temporary JsonDocument
-  // Use arduinojson.org/v6/assistant to compute the capacity.
-  StaticJsonDocument<500> doc;
+  // Allocate JsonBuffer
+  // Use arduinojson.org/assistant to compute the capacity.
+  StaticJsonBuffer<500> jsonBuffer;
+
+  // Create the root object
+  JsonObject& root = jsonBuffer.createObject();
 
   // Create the "analog" array
-  JsonArray analogValues = doc.createNestedArray("analog");
+  JsonArray& analogValues = root.createNestedArray("analog");
   for (int pin = 0; pin < 6; pin++) {
     // Read the analog input
     int value = analogRead(pin);
@@ -60,7 +61,7 @@ void loop() {
   }
 
   // Create the "digital" array
-  JsonArray digitalValues = doc.createNestedArray("digital");
+  JsonArray& digitalValues = root.createNestedArray("digital");
   for (int pin = 0; pin < 14; pin++) {
     // Read the digital input
     int value = digitalRead(pin);
@@ -74,11 +75,11 @@ void loop() {
   Serial.print(remoteIp);
   Serial.print(F(" on port "));
   Serial.println(remotePort);
-  serializeJson(doc, Serial);
+  root.printTo(Serial);
 
   // Send UDP packet
   udp.beginPacket(remoteIp, remotePort);
-  serializeJson(doc, udp);
+  root.printTo(udp);
   udp.println();
   udp.endPacket();
 
