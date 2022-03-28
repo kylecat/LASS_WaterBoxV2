@@ -1,5 +1,5 @@
 {
-    "fw_ver":"2.1.b_HP",
+    "fw_ver":"2.2.2",
     "device_id":"WaterBox-Demo",
     "interval":{
         "analysis_cycle":10,
@@ -7,8 +7,24 @@
         "upload_cycle":600
     },
     "wifi":{
-        "wifi_ssid":"KyleiPhoneXR",
-        "wifi_pass":"11115555"
+        "wifi_ssid":"GAIA",
+        "wifi_pass":"72956799"
+    },
+    "cal_ph":{
+        "raw_HIGH":10.84,
+        "raw_MID":6.87,
+        "raw_LOW":1.92,
+        "std_HIGH":10.01,
+        "std_MID":7.00,
+        "std_LOW":4.01
+    },
+    "cal_ec":{
+        "raw_HIGH":11073.68,
+        "raw_MID":1302.27,
+        "raw_LOW":0.0,
+        "std_HIGH":11575,
+        "std_MID":1212,
+        "std_LOW":0.0
     },
     "mqtt":{
         "mqtt_broker":"",
@@ -16,7 +32,7 @@
         "mqtt_user":"",
         "mqtt_pass":"",
         "mqtt_pub_topic":"",
-        "mqtt_sub_topic":"sub_topic"
+        "mqtt_sub_topic":""
     },
     "restful_api":{
         "http_server":"",
@@ -25,22 +41,6 @@
     },
     "thingspeak":{
         "api_key":"3HM7DXT2QAVJMB6C"
-    },
-    "cal_ph":{
-        "x_HIGH":10.00,
-        "x_MID":7.00,
-        "x_LOW":4.00,
-        "y_HIGH":10.01,
-        "y_MID":7.00,
-        "y_LOW":4.01
-    },
-    "cal_ec":{
-        "x_HIGH":12000,
-        "x_MID":1412,
-        "x_LOW":0.0,
-        "y_HIGH":12880,
-        "y_MID":1413,
-        "y_LOW":0.0
     },
     "vr_1":{
         "offset":4399,

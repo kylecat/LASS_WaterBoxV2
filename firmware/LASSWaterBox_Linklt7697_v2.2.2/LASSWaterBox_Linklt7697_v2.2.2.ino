@@ -577,20 +577,20 @@ void appendConfig(JsonObject &_json)
   sysConfig.restful_fromat = _buffer["restful_fromat"].as<String>(); // 放數值的保留字(Reserve Key):r_ +item, ex:r_PH,r_EC,r_DO,r_ORP,r_TEMP
 
   _buffer = _json.get<JsonVariant>("cal_ph");
-  cal_ph.x_HIGH = _buffer["x_HIGH"].as<float>();
-  cal_ph.x_MID = _buffer["x_MID"].as<float>();
-  cal_ph.x_LOW = _buffer["x_LOW"].as<float>();
-  cal_ph.y_HIGH = _buffer["y_HIGH"].as<float>();
-  cal_ph.y_MID = _buffer["y_MID"].as<float>();
-  cal_ph.y_LOW = _buffer["y_LOW"].as<float>();
+  cal_ph.x_HIGH = _buffer["raw_HIGH"].as<float>();
+  cal_ph.x_MID = _buffer["raw_MID"].as<float>();
+  cal_ph.x_LOW = _buffer["raw_LOW"].as<float>();
+  cal_ph.y_HIGH = _buffer["std_HIGH"].as<float>();
+  cal_ph.y_MID = _buffer["std_MID"].as<float>();
+  cal_ph.y_LOW = _buffer["std_LOW"].as<float>();
 
   _buffer = _json.get<JsonVariant>("cal_ec");
-  cal_ec.x_HIGH = _buffer["x_HIGH"].as<float>();
-  cal_ec.x_MID = _buffer["x_MID"].as<float>();
-  cal_ec.x_LOW = _buffer["x_LOW"].as<float>();
-  cal_ec.y_HIGH = _buffer["y_HIGH"].as<float>();
-  cal_ec.y_MID = _buffer["y_MID"].as<float>();
-  cal_ec.y_LOW = _buffer["y_LOW"].as<float>();
+  cal_ec.x_HIGH = _buffer["raw_HIGH"].as<float>();
+  cal_ec.x_MID = _buffer["raw_MID"].as<float>();
+  cal_ec.x_LOW = _buffer["raw_LOW"].as<float>();
+  cal_ec.y_HIGH = _buffer["std_HIGH"].as<float>();
+  cal_ec.y_MID = _buffer["std_MID"].as<float>();
+  cal_ec.y_LOW = _buffer["std_LOW"].as<float>();
 
   _buffer = _json.get<JsonVariant>("vr_1");
   sysConfig.vr1_offset = _buffer["offset"].as<int>();
@@ -611,7 +611,7 @@ void appendConfig(JsonObject &_json)
 
 }
 
-void showConfig()
+void showConfig(void)
 {
   Serial.println("----- System Config -----");
 
@@ -658,15 +658,16 @@ void showConfig()
   Serial.println("-------------------------\r\n");
 }
 
-void showCalConfig(String _name, CAL_CONFIG &_config) {
+void showCalConfig(String _name, CAL_CONFIG &_config)
+{
   Serial.print("****** ");
   Serial.print(_name);
   Serial.println(" Calibration Config ******");
 
   Serial.println("[ Data ]");
-  Serial.print("\t [High]  X/Y: "); Serial.print(_config.x_HIGH); Serial.print("/"); Serial.println(_config.y_HIGH);
-  Serial.print("\t [Mid ]  X/Y: "); Serial.print(_config.x_MID); Serial.print("/"); Serial.println(_config.y_MID);
-  Serial.print("\t [Low ]  X/Y: "); Serial.print(_config.x_LOW); Serial.print("/"); Serial.println(_config.y_LOW);
+  Serial.print("\t [High]  raw/std: "); Serial.print(_config.x_HIGH); Serial.print("/"); Serial.println(_config.y_HIGH);
+  Serial.print("\t [Mid ]  raw/std: "); Serial.print(_config.x_MID); Serial.print("/"); Serial.println(_config.y_MID);
+  Serial.print("\t [Low ]  raw/std: "); Serial.print(_config.x_LOW); Serial.print("/"); Serial.println(_config.y_LOW);
 
   Serial.println("[ Calibration ]");
   Serial.print("\t SLOP:"); Serial.println(_config.SLOP, 4);
@@ -678,8 +679,8 @@ void showCalConfig(String _name, CAL_CONFIG &_config) {
 
 // simple Linear Regression
 // reference: https://www.statisticshowto.com/probability-and-statistics/regression-analysis/find-a-linear-regression-equation/
-void simpleLinearRegression(CAL_CONFIG &_config) {
-
+void simpleLinearRegression(CAL_CONFIG &_config)
+{
   int _n = 3;
   float _sum_y = _config.y_HIGH + _config.y_MID + _config.y_LOW;
   float _sum_x = _config.x_HIGH + _config.x_MID + _config.x_LOW;
@@ -842,7 +843,7 @@ void showNTP(bool _new = false)
   Serial.print(cUTC.year);  Serial.print("/");  Serial.print(cUTC.month); Serial.print("/");  Serial.print(cUTC.day);
   Serial.print(" ");
   Serial.print(padding(cUTC.hour) + ":" + padding(cUTC.minute) + ":" + padding(cUTC.second));
-  
+
   Serial.print("\t");
   Serial.print(cUTC.WeeksOfYear);
   Serial.print(" Weeks and ");
@@ -984,13 +985,15 @@ String atlas_cmd(String _cmd, uint16_t _delayMS, uint8_t _addr, bool _info = fal
   return _responce;
 }
 
-void atlas_sleep(uint8_t _addr) {
+void atlas_sleep(uint8_t _addr)
+{
   Wire.beginTransmission(_addr);
   Wire.write("Sleep");
   Wire.endTransmission();
 }
 
-float get_DO(float _temp = 20.0) {
+float get_DO(float _temp = 20.0)
+{
   String _cmd = "rt," + String(_temp, 1);
 
   atlas_cmd("O,mg,1", 600, addr_DO); // 設定顯示 mg/L
@@ -1016,7 +1019,8 @@ float get_DO(float _temp = 20.0) {
     EC,<cmd>    // EC模組用的指令
     SYS,<cmd>   // 系統設定指令：如讀去目前的資料
 ***********************************/
-String getSerial(void) {
+String getSerial(void)
+{
   String _result;
   while (Serial.available())
   {
@@ -1028,7 +1032,8 @@ String getSerial(void) {
   return _result;
 }
 
-void sysCMD(String _cmd) {
+void sysCMD(String _cmd)
+{
   _cmd.toUpperCase();
   int _index = _cmd.indexOf(",");
   String _cmd_type = _cmd.substring(0, _index);
@@ -1047,7 +1052,8 @@ void sysCMD(String _cmd) {
 /***** << fromate function >> *****
    把int轉成2位數String，自動補0
 ***********************************/
-String convert_2digits(int i) {
+String convert_2digits(int i)
+{
   String number;
   if (i < 10) number = "0" + (String)i;
   else number = (String)i;
@@ -1302,10 +1308,120 @@ String WifiMac(bool _hasDash = false, bool _fullMac = false)
 }
 
 
-/***** << LinkIt 7697 IBP upload function >> *****
-   LinkIt 7697 WIFI 上傳IBP資料用
+/***** << LinkIt 7697 LASS upload function >> *****
+   LinkIt 7697 WIFI 上傳LASS資料用
 ***********************************/
-void mqtt_reconnect()
+String addLASS_msgTime(void)
+{
+  DateTime now = rtc.now();          // 取得目前時間
+  _year = now.year();
+  _month = now.month();
+  _day = now.day();
+  _hour = now.hour();
+  _minute = now.minute();
+  _second = now.second();
+  Tick = now.unixtime() - Tick;
+
+  String _strBuffer = "date=" + String(_year) + "-" + convert_2digits(_month) + "-" + convert_2digits(_day) + "|time=" + convert_2digits(_hour) + ":" + convert_2digits(_minute) + ":" + convert_2digits(_second) + "|tick=" + String(Tick);
+  return _strBuffer;
+}
+
+String addLASS_msgValue(float _value[], bool _debug = false)
+{
+  if (_debug)
+  {
+    Serial.print("     Temp: "); Serial.println(_value[0]);
+    Serial.print("       pH: "); Serial.println(_value[1]);
+    Serial.print("       EC: "); Serial.println(_value[2]);
+    Serial.print("Turbidity: "); Serial.println(_value[3]);
+    Serial.print("    Level: "); Serial.println(_value[4]);
+    Serial.print("       DO: "); Serial.println(_value[5]);
+    Serial.print("      ORP: "); Serial.println(_value[6]);
+  }
+  String _strBuffer = "s_t0=" + String(_value[0]) + "|s_ph=" + String(_value[1]) + "|s_ec=" + String(_value[2]) + "|s_Tb=" + String(_value[3]) + "|s_Lv=" + String(_value[4]) + "|s_DO =" + String(_value[5]) + "|s_orp=" + String(_value[6]);
+  return _strBuffer;
+}
+
+bool updateLASS(String _msgTime, String _msgValue)
+{
+  //  "https://pm25.lass-net.org/Upload/waterbox_tw.php"
+  //  "?topic=LASS/Test/WaterBox_TW&device_id=XXXXXXXXXXXX&key=NoKey&msg="
+  //  "|device=Linkit7697|device_id=9C65F920C020|ver_app=1.1.0|app=WaterBox_TW"
+  //  "|FAKE_GPS=1|gps_lat=25.1933|gps_lon = 121.787|"
+  //  "date=2019-03-21|time=06:53:55|tick=714436.97"
+  //  "|s_t0=20.00|s_ph=7.00|s_ec=200.0|s_Tb=500|s_Lv=|s_DO=8.0|s_orp=0.0|"
+
+  String Host = "pm25.lass-net.org";
+  String url = "https://" + Host + "/Upload/waterbox_tw.php";
+  String DeviceID = "Field_D01_" + WifiMac();
+  String DeviceInfo = "device=Linkit7697|device_id=" + DeviceID + "|ver_app=" + _fw + "|app=WaterBox_TW";
+  String Location = "FAKE_GPS=1|gps_lat=25.029387|gps_lon=121.579060";
+  String getStr = "GET " + url + "?topic=WaterBox_TW&device_id=" + DeviceID + "&key=NoKey&msg=|" + DeviceInfo + "|" + Location + "|" + _msgTime + "|" + _msgValue + "|";
+
+  sslclient.setRootCA(rootCA, sizeof(rootCA));
+
+  if (sslclient.connect(Host.c_str(), 443))
+  {
+    Serial.println("Update to LASS (GET)");
+    Serial.println(getStr);
+    // Make a HTTP request:
+    sslclient.println(getStr);
+    sslclient.println("Host : " + Host);
+    sslclient.println("Accept : */*");
+    sslclient.println("Connection: close");
+    sslclient.println();
+    delay(500);
+  }
+  else Serial.println("WIFI Serverconnect error");
+
+  while (sslclient.available()) {
+    char c = sslclient.read();
+    Serial.write(c);
+  }
+  sslclient.stop();
+  Serial.println();
+}
+
+
+void mqttLASS(String _msgTime, String _msgValue)
+{
+  String _topic = "LASS/Test/WaterBox_TW/" + WifiMac();
+
+  String _DeviceID = "Field_D01_" + WifiMac();
+  String _DeviceInfo = "device=Linkit7697|device_id=" + _DeviceID + "|ver_app=" + _fw + "|app=WaterBox_TW";
+  String _location = "FAKE_GPS=1|gps_lat=25.029387|gps_lon=121.579060";
+  String _msg = "|" + _DeviceInfo + "|" + _location + "|" + _msgTime + "|" + _msgValue + "|";
+
+
+  // 切斷先前的連線
+  if (mqtt.connected()) {
+    mqtt_disconnect();
+  }
+
+  // 設定LASS MQTT Broker
+  mqtt.setServer("gpssensor.ddns.net", 1883);
+  // 重新連線
+  mqtt_reconnect();
+
+  if (mqtt.connected()) {
+    Serial.println("[LASS] MQTT Connect Success");
+    mqtt.publish(_topic.c_str(), _msg.c_str());
+  }
+  else {
+    Serial.println("[LASS] MQTT Connect Fail");
+  }
+  Serial.println("[LASS] Publish done");
+  mqtt_disconnect();
+
+  // 更改回原本的 MQTT Broker 設定
+  mqtt.setServer(sysConfig.mqtt_broker.c_str(), sysConfig.mqtt_port);
+}
+
+
+/***** << LinkIt 7697 IBP upload function >> *****
+   LinkIt 7697 WIFI 上傳MQTT資料用
+***********************************/
+void mqtt_reconnect(void)
 {
   //  const char* _USERNAME = sysConfig.mqtt_user.c_str();
   //  const char* _PASSWORD = sysConfig.mqtt_pass.c_str();
@@ -1336,7 +1452,7 @@ void mqtt_reconnect()
   //  mqtt.unsubscribe(TOPIC);  // 取消訂閱Topic
 }
 
-void mqtt_disconnect()
+void mqtt_disconnect(void)
 {
   Serial.println("[MQTT] MQTT Disconnect");
   mqtt.unsubscribe(sysConfig.mqtt_sub_topic.c_str()); // 先取消訂閱TOPIC
@@ -1373,7 +1489,6 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length)
   }
   Serial.println();
 }
-
 
 /***** << LinkIt 7697 EEPROM function >> *****
   LinkIt 7697 內部記憶體的讀寫
@@ -1479,7 +1594,6 @@ bool alarm_check(float pH, float EC)
   return _pH_alarm || _EC_alarm;
 }
 
-
 bool CheckTag(unsigned long *r_tag, unsigned long _ms , bool _debug = false)
 {
   bool _result = false;
@@ -1510,8 +1624,8 @@ bool CheckTag(unsigned long *r_tag, unsigned long _ms , bool _debug = false)
   return _result;
 }
 
-
-void SystemTest_SD(int _loop) {
+void SystemTest_SD(int _loop)
+{
   SD.begin(SC_CS);
   pinMode(10, OUTPUT);      // 手動控制LoRa 的CS
   digitalWrite(10, HIGH);   // 上拉LoRa SPI 的CS腳位，避免抓到LoRa
@@ -1647,7 +1761,7 @@ void setup(void)
 
 
 /***** << Main function: Loop >> *****/
-void loop()
+void loop(void)
 {
   LWatchDog.feed();
   digitalWrite(modulePower, HIGH);    // 開啟模組電源
@@ -1655,14 +1769,16 @@ void loop()
   DateTime now = rtc.now();          // 取得目前時間
   _year = now.year();
   _month = now.month();
-  if (now.hour() + 8 > 23) {
-    _hour = now.hour() + 8 - 23;
-    _day = now.day() + 1;
-  }
-  else {
-    _hour = now.hour() + 8;
-    _day = now.day();
-  }
+  //  if (now.hour() + 8 > 23) {
+  //    _hour = now.hour() + 8 - 23;
+  //    _day = now.day() + 1;
+  //  }
+  //  else {
+  //    _hour = now.hour() + 8;
+  //    _day = now.day();
+  //  }
+  _hour = now.hour();
+  _day = now.day();
 
   _minute = now.minute();
   str_Time = convert_2digits(_hour) + ":" + convert_2digits(_minute);
@@ -1721,7 +1837,7 @@ void loop()
       Serial.print(_day, DEC);
       Serial.print(" ");
       Serial.print(str_Time);
-      Serial.print(" UTC+8");
+      Serial.print(" UTC+0");
       Serial.println(" *****");
       Serial.println("pH\t" + String(pH_value));
       Serial.println("Temp\t" + String(Temp_value) + " C");
@@ -1761,20 +1877,28 @@ void loop()
       OLED_content_title(str_Time, "WiFi", "Connect", "Analysis Mode", 1.0, false);
 
       connectWifi();
-      String _str_Time = String(_year) + "-" + convert_2digits(_month) + "-" + convert_2digits(_day) + " " +
-                         convert_2digits(_hour) + ":" + convert_2digits(_minute) + ":" + convert_2digits(now.second());
 
+      // LASS package (https)
+      SensorValue[0] = Temp_value;
+      SensorValue[1] = pH_value;
+      SensorValue[2] = EC_value;
+      SensorValue[3] = 0.0;
+      SensorValue[4] = 0.0;
+      SensorValue[5] = 0.0;
+      SensorValue[7] = 0.0;
 
+      String MQTT_Time = addLASS_msgTime();
+      String MQTT_Value = addLASS_msgValue(SensorValue, false);
+      
+//      updateLASS(MQTT_Time, MQTT_Value);
+//      mqttLASS(MQTT_Time, MQTT_Value);
 
-      //      {\"dataTime\":\"2020-11-16 20:36:00\",\"dCode_temp\":130.0}
-
-      //            String MQTT_Time = addLASS_msgTime();
-      //            String MQTT_Value = addLASS_msgValue(SensorValue, true);
-      //            updateLASS(MQTT_Time, MQTT_Value);
-
+      // Thingspeak (http)
       updateThingSpeak(sysConfig.thingspeak_key, String(Temp_value), String(pH_value), String(EC_value));
 
       /* MQTT 發資料*/
+      String _str_Time = String(_year) + "-" + convert_2digits(_month) + "-" + convert_2digits(_day) + " " +
+                         convert_2digits(_hour) + ":" + convert_2digits(_minute) + ":" + convert_2digits(now.second());
 
       if (sysConfig.mqtt_broker.length() > 0) {
         _mqtt_msg = "{\"dataTime\":\"" + _str_Time +
@@ -1783,22 +1907,17 @@ void loop()
                     ",\"EC\":" + EC_value +
                     ",\"DO_mg\":" + DO_value +
                     ",\"DO_percent\":" + DO_percent +
-                    "}";      String _mqtt_msg = "{\"dataTime\":\"" + _str_Time +
-                        "\",\"Temp\":" + Temp_value +
-                        ",\"pH\":" + pH_value +
-                        ",\"EC\":" + EC_value +
-                        ",\"DO_mg\":" + DO_value +
-                        ",\"DO_percent\":" + DO_percent +
-                        "}";
+                    "}";
+                    
         Serial.println("[MQTT Publish] Message:" + _mqtt_msg);
         Serial.println("[MQTT Publish] Message size:" + String(_mqtt_msg.length()));
 
         OLED_content_title(str_Time, "MQTT", "Publish", "Analysis Mode", 1.0, false);
 
         LWatchDog.feed();
-        mqtt_publish(_mqtt_msg);
-        Serial.println("[MQTT] Publish done");
-        mqtt_disconnect();
+//        mqtt_publish(_mqtt_msg);
+//        Serial.println("[MQTT] Publish done");
+//        mqtt_disconnect();
       }
 
       WiFi.disconnect();
@@ -1870,8 +1989,8 @@ void loop()
 
     Temp_value = getTemp();
 
-    String _state_OLDE_1 = "pH:" + String(pH_value);
-    String _state_OLDE_2 = "EC:" + String(EC_value);
+    String _state_OLDE_1 = "pH:" + String(raw_pH);
+    String _state_OLDE_2 = "EC:" + String(raw_EC);
     OLED_smallContent(_state_OLDE_1, _state_OLDE_2, String(Temp_value) + " C, @ " + str_Time, 0.1, false);
   } //end of 設定模式
 }
