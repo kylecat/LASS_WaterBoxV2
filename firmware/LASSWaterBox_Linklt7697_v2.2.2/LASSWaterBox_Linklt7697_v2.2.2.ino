@@ -1889,9 +1889,9 @@ void loop(void)
 
       String MQTT_Time = addLASS_msgTime();
       String MQTT_Value = addLASS_msgValue(SensorValue, false);
-      
-//      updateLASS(MQTT_Time, MQTT_Value);
-//      mqttLASS(MQTT_Time, MQTT_Value);
+
+      //      updateLASS(MQTT_Time, MQTT_Value);
+      //      mqttLASS(MQTT_Time, MQTT_Value);
 
       // Thingspeak (http)
       updateThingSpeak(sysConfig.thingspeak_key, String(Temp_value), String(pH_value), String(EC_value));
@@ -1908,27 +1908,27 @@ void loop(void)
                     ",\"DO_mg\":" + DO_value +
                     ",\"DO_percent\":" + DO_percent +
                     "}";
-                    
+
         Serial.println("[MQTT Publish] Message:" + _mqtt_msg);
         Serial.println("[MQTT Publish] Message size:" + String(_mqtt_msg.length()));
 
         OLED_content_title(str_Time, "MQTT", "Publish", "Analysis Mode", 1.0, false);
 
         LWatchDog.feed();
-//        mqtt_publish(_mqtt_msg);
-//        Serial.println("[MQTT] Publish done");
-//        mqtt_disconnect();
+        //        mqtt_publish(_mqtt_msg);
+        //        Serial.println("[MQTT] Publish done");
+        //        mqtt_disconnect();
       }
 
       WiFi.disconnect();
       OLED_content_title(str_Time, "Upload", "Finish", "Analysis Mode", 1.0, false);
-      Serial.println(" 完成上傳");
+      Serial.println("[SYSTEM] Upload Finish");
     }
 
     /*****<< 更新網路時間NTP Time >>*****/
     if (_updateNTP) {
       LWatchDog.feed();
-      Serial.println("[System] 更新NTP");
+      Serial.println("[System] Update NTP");
       connectWifi();
       OLED_content_title(str_Time, "NTP", "Check", "Analysis Mode", 1.0, false);
 
@@ -1937,10 +1937,13 @@ void loop(void)
       //      showNTP();
       LRTC.get();
       initRTC(true, LRTC.year(), LRTC.month(), LRTC.day(), LRTC.hour(), LRTC.minute(), LRTC.second());
-      Serial.println("[System] 更新完成");
+      Serial.println("[System] NTP has updated");
       OLED_content_title(str_Time, "NTP", "Done", "Analysis Mode", 1.0, false);
       WiFi.disconnect();
     }
+    
+    OLED_content_title(str_Time, "SYSTEM", "STANDBY", "Analysis Mode", 1.0, true);
+
   } // end of if (_mode)
 
   /*****<< 進入系統設定模式 >>*****/
