@@ -91,13 +91,18 @@ uint8_t DS18B20::getResolution() {
     switch (selectedScratchpad[CONFIGURATION]) {
         case RES_9_BIT:
             return 9;
+            break;
         case RES_10_BIT:
             return 10;
+            break;
         case RES_11_BIT:
             return 11;
+            break;
         case RES_12_BIT:
             return 12;
+            break;
     }
+    return 0;
 }
 
 void DS18B20::setResolution(uint8_t resolution) {

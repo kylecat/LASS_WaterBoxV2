@@ -235,7 +235,7 @@ int print_interval = 1000;
 int _c = 0;
 float Temp_value, pH_value, EC_value, Tubidity_value;
 float DO_percent, DO_value;
-float SensorValue[7] = {0};
+float SensorValue[8] = {0};
 bool _modeStatus = false;
 
 int chapter = 0;                               //  大項目：0~1(校正設定,時間設定)
@@ -602,12 +602,14 @@ void appendConfig(JsonObject &_json)
 
 
   // 基本檢查
-  if (sysConfig.analysis_cycle == 0) sysConfig.analysis_cycle = 150;
-  if (sysConfig.saving_cycle == 0) sysConfig.saving_cycle = 300;
-  if (sysConfig.upload_cycle == 0) sysConfig.upload_cycle = 600;
-  if (sysConfig.mqtt_broker == "") Serial.println("No MQTT Broker Config");
-  if (sysConfig.http_server == "") Serial.println("No Restful API Config");
-  if (sysConfig.https_server == "") Serial.println("No Restful APIs Config");
+  if (sysConfig.analysis_cycle == 0)  sysConfig.analysis_cycle = 150;
+  if (sysConfig.saving_cycle == 0)    sysConfig.saving_cycle = 300;
+  if (sysConfig.upload_cycle == 0)    sysConfig.upload_cycle = 600;
+  if (sysConfig.mqtt_broker == "")    Serial.println("No MQTT Broker Config");
+  if (sysConfig.http_server == "")    Serial.println("No Restful API Config");
+  if (sysConfig.https_server == "")   Serial.println("No Restful APIs Config");
+  if (sysConfig.wifi_ssid.length() != 0) ssid = sysConfig.wifi_ssid.c_str();
+  if (sysConfig.wifi_pass.length() != 0) pass = sysConfig.wifi_pass.c_str();
 
 }
 
@@ -742,7 +744,7 @@ bool compare(int _a, int _b)
   if (_a != _b)
   {
     _result = false;
-    Serial.println("[NTP] 錯誤: " + String(_a) + "-" + String(_b));
+    //    Serial.println("[NTP] 錯誤: " + String(_a) + "-" + String(_b));
   }
   return _result;
 }
@@ -854,7 +856,7 @@ void showNTP(bool _new = false)
 }
 
 // 檢察NTP跟系統時間，_reset 控制要不要更新系統時間
-bool checkNTP(bool _reset = false)
+void checkNTP(bool _reset = false)
 {
   bool _result = true;
 
@@ -869,7 +871,7 @@ bool checkNTP(bool _reset = false)
   _result = _result && compare(cUTC.second, LRTC.second());
 
   if (_reset && !_result) {
-    Serial.println("[NTP] 重設系統時間");
+    Serial.println("[NTP] Reset System Datetime");
     LRTC.set(cUTC.year, cUTC.month, cUTC.day, cUTC.hour, cUTC.minute, cUTC.second);
     showNTP();
   }
@@ -1168,9 +1170,6 @@ void showWiFiConcentStatus(void)
 
 int connectWifi(bool _debug = false)
 {
-  if (sysConfig.wifi_ssid.length() != 0) ssid = sysConfig.wifi_ssid.c_str();
-  if (sysConfig.wifi_pass.length() != 0) pass = sysConfig.wifi_pass.c_str();
-
   int _status = WiFi.status();
   if (_debug) {
     showWiFiConcentStatus();
@@ -1179,15 +1178,13 @@ int connectWifi(bool _debug = false)
   for (int _c = 0; _c < 5; _c++) {
     if (_status != WL_CONNECTED)
     {
-      Serial.print("Attempting to connect to SSID: ");
+      Serial.print("[WiFi] Attempting to connect to SSID: ");
       Serial.print(ssid);
       Serial.print("\t");
       Serial.println(pass);
 
       _status = WiFi.begin(ssid, pass);
 
-      Serial.print("reCheck SSID: ");
-      Serial.println(WiFi.SSID());
       if (_debug) {
         showWiFiConcentStatus();
       }
@@ -1195,7 +1192,6 @@ int connectWifi(bool _debug = false)
     else {
       break;
     }
-
   }
   return WiFi.status();
 }
@@ -1203,17 +1199,17 @@ int connectWifi(bool _debug = false)
 void printWifiStatus()
 {
   // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
+  Serial.print("[WiFi] SSID: ");
   Serial.println(WiFi.SSID());
 
   // print your WiFi shield's IP address:
   IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
+  Serial.print("[WiFi] IP Address: ");
   Serial.println(ip);
 
   // print the received signal strength:
   long rssi = WiFi.RSSI();
-  Serial.print("signal strength (RSSI):");
+  Serial.print("[WiFi] Signal strength (RSSI):");
   Serial.print(rssi);
   Serial.println(" dBm");
 }
@@ -1222,7 +1218,7 @@ void printWifiStatus()
 /***** << LinkIt 7697 upload function >> *****
    LinkIt 7697 WIFI 上傳資料用
 ***********************************/
-bool getLinkItLogo( bool _readResponse)
+void getLinkItLogo( bool _readResponse)
 {
   sslclient.setRootCA(rootCA, sizeof(rootCA));
   if (sslclient.connect(server, 443)) {
@@ -1252,7 +1248,7 @@ bool getLinkItLogo( bool _readResponse)
   sslclient.stop();
 }
 
-bool updateThingSpeak(String _api, String _field1Value, String _field2Value, String _field3Value)
+void updateThingSpeak(String _api, String _field1Value, String _field2Value, String _field3Value)
 {
   String server = "api.thingspeak.com";
   String _field1 = "&field1=" + _field1Value;
@@ -1342,7 +1338,7 @@ String addLASS_msgValue(float _value[], bool _debug = false)
   return _strBuffer;
 }
 
-bool updateLASS(String _msgTime, String _msgValue)
+void updateLASS(String _msgTime, String _msgValue)
 {
   //  "https://pm25.lass-net.org/Upload/waterbox_tw.php"
   //  "?topic=LASS/Test/WaterBox_TW&device_id=XXXXXXXXXXXX&key=NoKey&msg="
@@ -1484,7 +1480,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length)
   Serial.print("[MQTT] Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
-  for (int i = 0; i < length; i++) {
+  for (uint16_t i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
@@ -1667,13 +1663,13 @@ void setup(void)
 
 
   Serial.begin(9600);
-  Serial.println("System Start");
+  Serial.println("[SYSTEM] System Start");
   OLED_content("Serial Port", "CHECKED", 1.0, false);
 
   // ADS1115 初始化
   initADC();
   OLED_content("ADS1115", "Init", 1, false);
-  Serial.println("ADS1115 初始化完成");
+  Serial.println("[SYSTEM] ADS1115 Init Done");
 
   OLED_content("Loading", "SD Config", 1.0, false);
   loadConfig(CONFIG_PATH);
@@ -1681,12 +1677,12 @@ void setup(void)
   simpleLinearRegression(cal_ec);
   showConfig();
 
-  Serial.println("系統設定初始化完成");
+  Serial.println("[SYSTEM] System initialization completed");
   OLED_content("System", "DONE" , 1.0, false);
 
   pinMode(pinLED, OUTPUT);
 
-  Serial.println("倒數三秒");
+  Serial.println("[SYSTEM] Countdown 3 seconds");
   OLED_content("Sleep", "TEST(3)" , 1.0, true);
   atlas_sleep(97);
 
@@ -1703,7 +1699,7 @@ void setup(void)
   digitalWrite(modulePower, LOW);  // 關閉模組電源
 
   digitalWrite(pinLED, HIGH);
-  Serial.println("System Init Done");
+  Serial.println("[SYSTEM] System Init Done");
 
   digitalWrite(modulePower, HIGH);  // 開啟模組電源
   OLED_content("Hello", "LASS", 1, false);
@@ -1712,9 +1708,9 @@ void setup(void)
   Serial.println();
   Serial.println(Description_Tittle);
   Serial.println(Description_Firware);
-  Serial.println(F("版本功能："));
+  Serial.println(F("The Function："));
   Serial.println("\t" + Description_Features);
-  Serial.println(F("注意事項："));
+  Serial.println(F("Notes："));
   Serial.println("\t" + Description_Precautions);
   Serial.println();
   Serial.println(F("**************************************"));
@@ -1723,15 +1719,14 @@ void setup(void)
 
   OLED_content("WatechDog", "20s Ready", 1, false);
   LWatchDog.begin(20);
-  Serial.println("[Watech Dog] init dog....");
+  Serial.println("[WatechDog] Init Watch dog....");
 
-  if (ssid != "") {
+  if (String(ssid) != "") {
     OLED_content("Connect", "Wifi", 1, false);
     status = connectWifi(true);
+
     if (status == WL_CONNECTED)
     {
-      mqtt_id = "METL_WaterBoxHP_" + WifiMac();
-      Serial.println("[MQTT] MQTT Client ID: " + mqtt_id);
       printWifiStatus();
 
       LWatchDog.feed();
@@ -1739,24 +1734,28 @@ void setup(void)
       checkNTP(true);
       LRTC.get();
       initRTC(true, LRTC.year(), LRTC.month(), LRTC.day(), LRTC.hour(), LRTC.minute(), LRTC.second());
-      Serial.println("DS3231 初始化完成");
+      Serial.println("[SYSTEM] DS3231 Init Done");
 
       LWatchDog.feed();
       getLinkItLogo(true);
     }
-
-    if (sysConfig.mqtt_broker.length() > 0) {
-      mqtt.setServer(sysConfig.mqtt_broker.c_str(), sysConfig.mqtt_port);
-      mqtt.setCallback(mqtt_callback);
-      mqtt_publish("Hi WaterBox Ver2.0!");    // MQTT 測試用
-    }
+    //    if (sysConfig.mqtt_broker != "") {
+    //      mqtt_id = "WB_" + WifiMac();
+    //      Serial.println("[MQTT] MQTT Client ID: " + mqtt_id);
+    //      mqtt.setServer(sysConfig.mqtt_broker.c_str(), sysConfig.mqtt_port);
+    //      mqtt.setCallback(mqtt_callback);
+    //      mqtt_publish("Hi WaterBox Ver2.0!");    // MQTT 測試用
+    //    }
     WiFi.disconnect();
+
+    Serial.println("[WiFi] Disconnect...");
   }
+
   LWatchDog.feed();
-  atlas_sleep(97); // 關閉DO 模組的電源
-  digitalWrite(modulePower, LOW);         // 關閉電源
+//  atlas_sleep(97); // 關閉DO 模組的電源
   OLED_content("Setup", "Done", 1, false);
-  Serial.println("End of Setup");
+  Serial.println("[SYSTEM] End of Setup");
+  digitalWrite(modulePower, LOW);         // 關閉電源
 }
 
 
@@ -1829,7 +1828,7 @@ void loop(void)
       //      OLED_content_title(str_Time, "EC: " + String(EC_value), "DO: " + String(DO_value), "Analysis Mode", 1.5, true);
       OLED_content_title(str_Time, "EC: " + String(EC_value), "", "Analysis Mode", 1.5, true);
 
-      Serial.print("***** 測值 @");
+      Serial.print("***** Sansering Data @");
       Serial.print(_year, DEC);
       Serial.print('/');
       Serial.print(_month, DEC);
@@ -1866,7 +1865,7 @@ void loop(void)
 
       SavingData(CSV_fileName, CSV_Data);     //  寫入CSV
       OLED_content_title(str_Time, "SD", "Done", "Analysis Mode", 1.0, false);
-      Serial.println("[SD] 完成寫入SD");
+      Serial.println("[SD] Writing data has been completed");
     }
 
     /*****<< 上傳至ThingSpeak或是LASS >>*****/
@@ -1941,7 +1940,7 @@ void loop(void)
       OLED_content_title(str_Time, "NTP", "Done", "Analysis Mode", 1.0, false);
       WiFi.disconnect();
     }
-    
+
     OLED_content_title(str_Time, "SYSTEM", "STANDBY", "Analysis Mode", 1.0, true);
 
   } // end of if (_mode)
@@ -1949,7 +1948,7 @@ void loop(void)
   /*****<< 進入系統設定模式 >>*****/
   else {
     if (_modeStatus != _mode) {
-      Serial.println("**********<< 進入設定模式 >>**********");
+      Serial.println("**********<< Show pH, EC Raw Data >>**********");
       _modeStatus = _mode;
       showCalConfig("pH", cal_ph);
       showCalConfig("EC", cal_ec);
