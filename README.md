@@ -114,6 +114,7 @@ B.使用電路板上USB charge，以MicroUSB線(type B)充電(建議使用1.0A�
     - 單一功能測試[：UnitTest](https://github.com/kylecat/LASS_WaterBoxV2/tree/master/UnitTest)
     - 整機程式碼[：](https://github.com/kylecat/LASS_WaterBoxV2/tree/master/UnitTest)[firmware](https://github.com/kylecat/LASS_WaterBoxV2/tree/master/firmware)
     - 模組驗證[：Verification](https://github.com/kylecat/LASS_WaterBoxV2/tree/master/Verification)
+    - 
 https://github.com/LinkItONEDevGroup/LASS_WaterBoxV2
 
     - 使用方式：下載後需設定ArduinoIDE，確保有抓到GitHub內附的ArduinoLibrary。
