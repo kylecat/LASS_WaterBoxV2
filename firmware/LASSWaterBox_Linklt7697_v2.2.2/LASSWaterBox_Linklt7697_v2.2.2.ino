@@ -1788,7 +1788,7 @@ void loop(void)
     /*****<< 進入分析運作模式 >>*****/
   {
     if (_modeStatus != _mode) {
-      Serial.println("**********<< 進入分析模式 >>**********");
+      Serial.println("**********<< Analyze Mode >>**********");
       _modeStatus = _mode;
       loadConfig(CONFIG_PATH);
       simpleLinearRegression(cal_ph);
